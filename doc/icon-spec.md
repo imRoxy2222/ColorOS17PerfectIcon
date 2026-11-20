@@ -317,8 +317,18 @@ OS16 新增桌面大图标，需要额外提供底板，素材放在 `icons/res/
 
 | 阶段 | 行为 |
 |---|---|
-| 安装 | `customize.sh` 把 `hdpi/*` 复制到 `/data/oplus/uxicons/`；`post-fs-data.sh` 把 `my_product/media/theme` 绑定挂载到 `/my_product/media/theme` |
+| 安装 | `customize.sh` 执行 `pm list packages`，只把**本机已安装应用**对应的图标目录复制到 `/data/oplus/uxicons/`；`post-fs-data.sh` 把 `my_product/media/theme` 绑定挂载到 `/my_product/media/theme` |
+| 开机 | `service.sh` 再次执行增量同步，为新安装的应用补图标（目标目录已存在则跳过） |
 | 卸载 | `uninstall.sh` 清空 `/data/oplus/uxicons/*`，再把 `uxicons.zip` 解压回去 |
+
+包名匹配规则（`icon_sync.sh`）：
+
+1. 目录名与已安装包名完全相同 → 复制。
+2. 目录名以 `<包名>.` 开头（包名 + Activity）→ 复制，用于只替换某个桌面入口。
+3. `A和B` 形式的合并目录 → 任一部分已安装即复制。
+4. `plus.H*` 哈希目录无法映射到包名 → 跳过。
+5. `temp_*`、`.trashed-*`、`*.bak`、隐藏目录 → 跳过。
+6. 安装阶段获取不到包名列表时，回退为全量复制；开机阶段则跳过本次同步，不影响开机。
 
 > 注意两处路径差异：仓库里是 `.../uxicons/hdpi/<包名>/`，安装后是 `/data/oplus/uxicons/<包名>/`（少一层 `hdpi`）；而 `uxicons.zip` 内部自带一层 `uxicons/`，解压后会生成 `/data/oplus/uxicons/uxicons/<包名>/`。制作替换包时需确认桌面实际读取的是哪一层。
 

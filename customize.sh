@@ -6,19 +6,15 @@ LATESTARTSERVICE=true
 
 unzip -o "$ZIPFILE" -x 'META-INF/*' -d $MODPATH >&2
 
-ui_print "正在写入oplus目录"
+ui_print "- 正在同步已安装应用的图标"
 SOURCE_ICONS="$MODPATH/my_product/media/theme/uxicons/hdpi"
 TARGET_ICONS="/data/oplus/uxicons"
 
-if [ ! -d "$TARGET_ICONS" ]; then
-  mkdir -p "$TARGET_ICONS"
-fi
-
 if [ -d "$SOURCE_ICONS" ]; then
-  cp -rf "$SOURCE_ICONS"/* "$TARGET_ICONS/"
-  chmod -R 0777 "$TARGET_ICONS"
+  . "$MODPATH/icon_sync.sh"
+  sync_icons "$SOURCE_ICONS" "$TARGET_ICONS" full
 else
-  ui_print "提示：压缩包内未找到 hdpi 文件夹，跳过覆盖"
+  ui_print "! 压缩包内未找到 hdpi 文件夹，跳过图标同步"
 fi
 
 set_perm_recursive $MODPATH 0 0 0777 0777

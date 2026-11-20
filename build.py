@@ -40,7 +40,10 @@ EXCLUDE_SUFFIXES = {".zip", ".pyc", ".pyo", ".log", ".swp"}
 KEEP_ZIP = "uxicons.zip"
 
 # 需要保留可执行权限的文件
-EXECUTABLE_FILES = {"customize.sh", "post-fs-data.sh", "uninstall.sh", "update-binary"}
+EXECUTABLE_FILES = {
+    "customize.sh", "post-fs-data.sh", "uninstall.sh", "service.sh",
+    "icon_sync.sh", "update-binary",
+}
 
 # 打包前必须存在的文件
 REQUIRED_FILES = [
