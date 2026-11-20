@@ -126,6 +126,27 @@ jobs:
           python3 build.py -q -o "$OUT"
           echo "name=$OUT" >> "$GITHUB_OUTPUT"
 
+      - name: 生成 update.json
+        run: |
+          CODE=$(git rev-list --count HEAD)
+          python3 - "$GITHUB_REF_NAME" "$CODE" "${{ steps.module.outputs.name }}" <<'PY'
+          import json
+          import sys
+          import urllib.parse
+
+          tag, code, zip_name = sys.argv[1], sys.argv[2], sys.argv[3]
+          base = "https://github.com/imRoxy2222/ColorOS17PerfectIcon"
+          data = {
+              "version": code,
+              "versionCode": int(code),
+              "zipUrl": f"{base}/releases/download/{tag}/{urllib.parse.quote(zip_name)}",
+              "changelog": f"{base}/releases/tag/{tag}",
+          }
+          with open("update.json", "w", encoding="utf-8") as f:
+              json.dump(data, f, ensure_ascii=False, indent=2)
+              f.write("\n")
+          PY
+
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
         with:
@@ -133,6 +154,7 @@ jobs:
           path: |
             ${{ steps.apk.outputs.name }}
             ${{ steps.module.outputs.name }}
+            update.json
 
       - name: 发布 Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -144,3 +166,4 @@ jobs:
           files: |
             ${{ steps.apk.outputs.name }}
             ${{ steps.module.outputs.name }}
+            update.json

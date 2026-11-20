@@ -42,9 +42,10 @@ APK 由 Actions 构建并签名，密钥保存在仓库 Secrets 中。本机已�
 
 ## 2. 日常发版
 
-1. **版本号规则**：
-   - APP 的 `versionName` 固定为 `1.0`，`versionCode` 自动取 `git rev-list --count HEAD`，两处都不要手改；
-   - `module.prop` 的 `version=` / `versioncode=` 建议改成本次 tag 号，方便 Magisk 管理器里显示（不参与产物命名）。
+1. **版本号规则**（都不用手改）：
+   - APP 的 `versionName` 固定为 `1.0`，`versionCode` 自动取 `git rev-list --count HEAD`；
+   - 模块 `module.prop` 的 `version` / `versioncode` 在打包时由 `build.py` 改写成同一个 commit 数，
+     仓库里的文件保留原值即可。
 2. 提交并推送到 `master`。
 3. 打 tag。tag 是**纯数字**，从 `1` 开始依次递增（`1`、`2`、`3` …），不是 `v16.2.9` 这种：
 
@@ -64,12 +65,16 @@ APK 由 Actions 构建并签名，密钥保存在仓库 Secrets 中。本机已�
    | --- | --- |
    | `完美图标.apk` | 已用 `coloros17` 密钥签名的 release APK |
    | `完美图标模块_<commit数>_适配<数量>.zip` | 可直接刷入的 Magisk 模块 |
+   | `update.json` | Magisk 管理器的更新清单，固定通过 `releases/latest/download/update.json` 访问 |
 
    文件名规则：
-   - `commit数`：`git rev-list --count HEAD`，与 APP 的 `versionCode` 同源，随提交数递增；
+   - `commit数`：`git rev-list --count HEAD`，与 APP 的 `versionCode`、模块的 `version` 同源，随提交数递增；
    - `数量`：`my_product/media/theme/uxicons/hdpi/` 下实际覆盖的包名数。统计时会自动
      跳过 `temp_*`、`plus.*`、`icons-*`、`.trashed*`、`*.bak`、无点号的杂项目录，
      把“包名.Activity”目录归并到包名，`A和B` 这种目录按 2 个应用计数。
+   - `update.json` 里 `version` / `versionCode` 同样是 commit 数，`zipUrl` 指向本次发布的模块 zip，
+     `changelog` 指向本次 Release 页面。`module.prop` 中的 `updateJson` 永远指向 latest，
+     所以每次发版后 Magisk 管理器都能检测到新版本。
 
    没有打 tag 时（手动 `Run workflow`）只上传 Actions Artifacts，不会创建 Release。
 
@@ -84,8 +89,9 @@ APK 由 Actions 构建并签名，密钥保存在仓库 Secrets 中。本机已�
 5. `./gradlew :app:assembleRelease`，签名配置读取环境变量（见 `code/app/build.gradle.kts` 的 `signingConfigs`）。
 6. `apksigner verify` 校验签名，并把 APK 重命名为 `完美图标.apk`。
 7. 统计 `my_product/media/theme/uxicons/hdpi/` 覆盖的包名数，用 `python3 build.py`
-   打包模块 zip（自动排除 `code/`、`doc/`、`dist/`、`.github/`）。
-8. 用 `softprops/action-gh-release` 创建 Release 并附加两个文件。
+   打包模块 zip（自动排除 `code/`、`doc/`、`dist/`、`.github/`，并把模块版本写成 commit 数）。
+8. 生成 `update.json`：`version` / `versionCode` 为 commit 数，`zipUrl` 指向本次模块 zip。
+9. 用 `softprops/action-gh-release` 创建 Release 并附加三个文件。
 
 ---
 

@@ -40,6 +40,9 @@ ColorOS17PerfectIcon/
 从 [Releases](../../releases) 下载 `完美图标模块_*.zip`，在 Magisk / KernelSU 里刷入后重启。
 安装脚本只把**手机上已安装应用**的图标复制到 `/data/oplus/uxicons/`，开机时会再增量同步一次。
 
+模块内置 `updateJson`（指向 `releases/latest/download/update.json`），发版后可以直接在
+Magisk 管理器里检测并更新，不需要手动下载 zip。
+
 ## 文档
 
 | 文档 | 内容 |

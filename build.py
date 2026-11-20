@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
 import sys
 import time
 import zipfile
@@ -33,6 +34,7 @@ EXCLUDE_DIRS = {
 # 指定文件名跳过
 EXCLUDE_FILES = {
     ".gitignore", ".DS_Store", "Thumbs.db", "desktop.ini", "build.py", "README.md",
+    "update.json",
 }
 
 # 按扩展名跳过；uxicons.zip 例外（uninstall.sh 需要它）
@@ -69,6 +71,34 @@ def parse_prop(path: Path) -> dict[str, str]:
     return props
 
 
+def git_commit_count() -> int | None:
+    """当前 HEAD 的 commit 数；不在 git 仓库时返回 None。"""
+    try:
+        result = subprocess.run(
+            ["git", "rev-list", "--count", "HEAD"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if result.returncode != 0:
+            return None
+        return int(result.stdout.strip())
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def apply_commit_version(data: bytes, count: int) -> bytes:
+    """把 module.prop 里的 version / versioncode 改写成 commit 数。"""
+    lines = []
+    for line in data.decode("utf-8").splitlines():
+        key = line.split("=", 1)[0].strip() if "=" in line else ""
+        if key in ("version", "versioncode"):
+            line = f"{key}={count}"
+        lines.append(line)
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
 def iter_files(exclude_paths: set[Path]):
     """按稳定顺序遍历需要打包的文件。"""
     for dirpath, dirnames, filenames in os.walk(ROOT):
@@ -98,6 +128,7 @@ def build(output: Path, quiet: bool = False) -> Path:
     props = parse_prop(ROOT / "module.prop")
     module_id = props.get("id", "module")
     version = props.get("version", "unknown")
+    commit_count = git_commit_count()
 
     output = output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -111,9 +142,11 @@ def build(output: Path, quiet: bool = False) -> Path:
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for path, rel in files:
             data = path.read_bytes()
+            arcname = rel.as_posix()
+            if arcname == "module.prop" and commit_count is not None:
+                data = apply_commit_version(data, commit_count)
             total_size += len(data)
 
-            arcname = rel.as_posix()
             info = zipfile.ZipInfo(arcname)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.date_time = time.localtime(path.stat().st_mtime)[:6]
@@ -128,7 +161,7 @@ def build(output: Path, quiet: bool = False) -> Path:
         excluded = sorted(EXCLUDE_DIRS & {p.name for p in ROOT.iterdir() if p.is_dir()})
         print()
         print(f"系统      : {sys.platform}")
-        print(f"模块      : {module_id} {version}")
+        print(f"模块      : {module_id} {commit_count if commit_count is not None else version}")
         print(f"文件数量  : {len(files)}")
         print(f"原始大小  : {total_size / 1024 / 1024:.2f} MiB")
         print(f"压缩后    : {output.stat().st_size / 1024 / 1024:.2f} MiB")
