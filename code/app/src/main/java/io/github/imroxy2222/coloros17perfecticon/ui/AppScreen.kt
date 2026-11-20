@@ -91,6 +91,7 @@ import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.graphics.ColorUtils
 import io.github.imroxy2222.coloros17perfecticon.R
 import io.github.imroxy2222.coloros17perfecticon.export.Exporter
+import io.github.imroxy2222.coloros17perfecticon.icon.AdaptState
 import io.github.imroxy2222.coloros17perfecticon.icon.AppItem
 import io.github.imroxy2222.coloros17perfecticon.icon.IconExtractor
 import io.github.imroxy2222.coloros17perfecticon.icon.ThemeIconPack
@@ -177,8 +178,9 @@ fun AppScreen() {
     val filtered = remember(snapshot, tab, query) {
         snapshot.filter { item ->
             val tabMatched = when (tab) {
-                1 -> !item.adapted
-                2 -> item.adapted
+                1 -> item.state == AdaptState.NONE
+                2 -> item.state == AdaptState.SELF
+                3 -> item.state == AdaptState.MODULE
                 else -> true
             }
             tabMatched && (query.isBlank() ||
@@ -297,13 +299,15 @@ fun AppScreen() {
 
     LaunchedEffect(Unit) { startScan() }
 
-    val adaptedCount = snapshot.count { it.adapted }
+    val moduleCount = snapshot.count { it.state == AdaptState.MODULE }
+    val selfCount = snapshot.count { it.state == AdaptState.SELF }
     val summaryTitle = if (state.scanning) {
         "正在扫描 ${state.scanned} / ${state.total}"
     } else {
         "共 ${snapshot.size} 个应用"
     }
-    val summaryDetail = "未适配 ${snapshot.size - adaptedCount} · 已适配 $adaptedCount"
+    val summaryDetail =
+        "未适配 ${snapshot.size - moduleCount - selfCount} · 自适配 $selfCount\n已适配 $moduleCount"
     val selectedCount = state.selected.count { it.value }
     val exportCount = if (selectedCount > 0) selectedCount else filtered.size
     val pageLayer = rememberGraphicsLayer()
@@ -347,7 +351,7 @@ fun AppScreen() {
                                 minWidth = 0.dp,
                             ) {
                                 Column(Modifier.width(112.dp).padding(vertical = 8.dp)) {
-                                    listOf("全部", "未适配", "已适配").forEachIndexed { index, label ->
+                                    listOf("全部", "未适配", "自适配", "已适配").forEachIndexed { index, label ->
                                         Text(
                                             label,
                                             modifier = Modifier
@@ -603,7 +607,7 @@ private fun OptionsDrawer(state: UiState) {
             checked = state.optIncludeAdapted,
             onCheckedChange = { state.optIncludeAdapted = it },
             title = "导出已适配应用",
-            summary = "默认只导出未适配应用",
+            summary = "默认跳过模块里已有夜间图标的应用",
             insideMargin = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
         )
         SuperSwitch(
@@ -737,7 +741,7 @@ private fun AppRow(item: AppItem, selected: Boolean, onToggle: () -> Unit) {
         },
         endActions = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                StatusTag(adapted = item.adapted)
+                StatusTag(state = item.state)
                 Spacer(Modifier.width(6.dp))
                 Checkbox(
                     state = ToggleableState(selected),
@@ -764,9 +768,9 @@ private fun AppRow(item: AppItem, selected: Boolean, onToggle: () -> Unit) {
 }
 
 @Composable
-private fun StatusTag(adapted: Boolean) {
-    if (adapted) {
-        Box(
+private fun StatusTag(state: AdaptState) {
+    when (state) {
+        AdaptState.MODULE -> Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(6.dp))
                 .background(MiuixTheme.colorScheme.primaryContainer)
@@ -779,8 +783,22 @@ private fun StatusTag(adapted: Boolean) {
                 color = MiuixTheme.colorScheme.onPrimaryContainer,
             )
         }
-    } else {
-        Text(
+
+        AdaptState.SELF -> Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.14f))
+                .padding(horizontal = 7.dp, vertical = 2.dp),
+        ) {
+            Text(
+                "自适配",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = MiuixTheme.colorScheme.primary,
+            )
+        }
+
+        AdaptState.NONE -> Text(
             "未适配",
             fontSize = 11.sp,
             color = MiuixTheme.colorScheme.error,
@@ -905,7 +923,7 @@ private fun BottomPanel(
                                 detail,
                                 style = MiuixTheme.textStyles.footnote1,
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                maxLines = 1,
+                                maxLines = 2,
                             )
                         }
                         TextButton(

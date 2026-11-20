@@ -55,15 +55,55 @@ class IconExtractor(context: Context) {
     fun detect(app: LauncherApp, pack: ThemeIconPack): AppItem {
         val icon = loadIcon(app.pkg, app.iconRes, night = false)
         val adaptiveIcon = icon as? AdaptiveIconDrawable
+        val state = when {
+            pack.hasNightIcon(app.pkg) -> AdaptState.MODULE
+            // 图标包里有这个应用但夜间前景与日间相同：桌面用的仍是包里的图，APK 自带夜间图不会生效
+            pack.hasIcon(app.pkg) -> AdaptState.NONE
+            isSelfAdaptive(app.pkg, app.iconRes) -> AdaptState.SELF
+            else -> AdaptState.NONE
+        }
         return AppItem(
             pkg = app.pkg,
             label = app.label,
             iconRes = app.iconRes,
-            adapted = pack.hasNightIcon(app.pkg),
+            state = state,
             adaptive = adaptiveIcon != null,
             monochrome = adaptiveIcon?.let { hasMonochrome(it) } ?: false,
             preview = icon?.let { renderPreview(it, PREVIEW_SIZE) }?.asImageBitmap(),
         )
+    }
+
+    /** 分别用日间/夜间 Configuration 渲染图标，比较差异判断 APK 自身是否带夜间图标。 */
+    private fun isSelfAdaptive(pkg: String, iconRes: Int): Boolean {
+        val day = loadIcon(pkg, iconRes, night = false) ?: return false
+        val night = loadIcon(pkg, iconRes, night = true) ?: return false
+        val dayBitmap = runCatching { renderComposite(day, PREVIEW_SIZE) }.getOrNull() ?: return false
+        val nightBitmap = runCatching { renderComposite(night, PREVIEW_SIZE) }.getOrNull() ?: return false
+        val ratio = diffRatio(dayBitmap, nightBitmap)
+        dayBitmap.recycle()
+        nightBitmap.recycle()
+        return ratio > SELF_ADAPT_THRESHOLD
+    }
+
+    /** 有明显颜色差异的像素占比；只算 RGB，忽略抗锯齿级别的细微差别。 */
+    private fun diffRatio(a: Bitmap, b: Bitmap): Float {
+        if (a.width != b.width || a.height != b.height) return 1f
+        val size = a.width * a.height
+        val pixelsA = IntArray(size)
+        val pixelsB = IntArray(size)
+        a.getPixels(pixelsA, 0, a.width, 0, 0, a.width, a.height)
+        b.getPixels(pixelsB, 0, b.width, 0, 0, b.width, b.height)
+        var changed = 0
+        for (i in 0 until size) {
+            val x = pixelsA[i]
+            val y = pixelsB[i]
+            val dr = kotlin.math.abs((x shr 16 and 0xFF) - (y shr 16 and 0xFF))
+            val dg = kotlin.math.abs((x shr 8 and 0xFF) - (y shr 8 and 0xFF))
+            val db = kotlin.math.abs((x and 0xFF) - (y and 0xFF))
+            val da = kotlin.math.abs((x ushr 24) - (y ushr 24))
+            if (dr + dg + db + da > 32) changed++
+        }
+        return changed.toFloat() / size
     }
 
     fun loadIcon(pkg: String, iconRes: Int, night: Boolean): Drawable? {
@@ -150,6 +190,8 @@ class IconExtractor(context: Context) {
     private companion object {
         const val PREVIEW_SIZE = 160
         const val HIGH_DENSITY = 640
+        /** 日/夜图标有明显差异的像素占比下限。 */
+        const val SELF_ADAPT_THRESHOLD = 0.02f
     }
 }
 
@@ -180,6 +222,13 @@ class ThemeIconPack private constructor(
             if (name.startsWith(prefix)) return nightOf(list)
         }
         return false
+    }
+
+    /** 图标包里是否有该应用（不区分夜间前景是否与日间相同）。 */
+    fun hasIcon(pkg: String): Boolean {
+        if (dirs.containsKey(pkg)) return true
+        val prefix = "$pkg."
+        return dirs.keys.any { it.startsWith(prefix) }
     }
 
     private fun nightOf(dirsOfPkg: List<File>): Boolean = dirsOfPkg.any { dir ->

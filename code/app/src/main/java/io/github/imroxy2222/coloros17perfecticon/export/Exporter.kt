@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
+import io.github.imroxy2222.coloros17perfecticon.icon.AdaptState
 import io.github.imroxy2222.coloros17perfecticon.icon.AppItem
 import io.github.imroxy2222.coloros17perfecticon.icon.IconExtractor
 import kotlinx.coroutines.CancellationException
@@ -31,6 +32,7 @@ import java.util.zip.ZipOutputStream
  * icon.zip
  * ├── index.json
  * ├── 未适配/<包名>/icon.png [bg.png fg.png mono.png] [raw/...]
+ * ├── 自适配/<包名>/icon.png icon2.png [bg.png fg.png mono.png]
  * └── 已适配/<包名>/icon.png icon2.png [bg.png fg.png mono.png]
  */
 class Exporter(private val context: Context, private val extractor: IconExtractor) {
@@ -49,7 +51,11 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
         options: Options,
         onProgress: (done: Int, total: Int, label: String) -> Unit,
     ): Result = withContext(Dispatchers.IO) {
-        val targets = if (options.includeAdapted) apps else apps.filter { !it.adapted }
+        val targets = if (options.includeAdapted) {
+            apps
+        } else {
+            apps.filter { it.state != AdaptState.MODULE }
+        }
         val skipped = apps.size - targets.size
         val rawAssets = if (options.rootRaw) RawAssets(context) else null
 
@@ -123,7 +129,11 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
         rawAssets: RawAssets?,
         index: JSONArray,
     ): Boolean {
-        val dir = (if (app.adapted) "已适配/" else "未适配/") + app.pkg
+        val dir = when (app.state) {
+            AdaptState.MODULE -> "已适配/"
+            AdaptState.SELF -> "自适配/"
+            AdaptState.NONE -> "未适配/"
+        } + app.pkg
         val files = mutableListOf<String>()
 
         val dayIcon = extractor.loadIcon(app.pkg, app.iconRes, night = false)
@@ -149,7 +159,7 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
             }
         }
 
-        if (app.adapted) {
+        if (app.state != AdaptState.NONE) {
             val nightIcon = extractor.loadIcon(app.pkg, app.iconRes, night = true)
             if (nightIcon != null) {
                 runCatching { extractor.renderComposite(nightIcon, options.size) }.getOrNull()?.let {
@@ -171,7 +181,15 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
         index.put(JSONObject().apply {
             put("package", app.pkg)
             put("label", app.label)
-            put("adapted", app.adapted)
+            put(
+                "state",
+                when (app.state) {
+                    AdaptState.MODULE -> "module"
+                    AdaptState.SELF -> "self"
+                    AdaptState.NONE -> "none"
+                },
+            )
+            put("adapted", app.state == AdaptState.MODULE)
             put("adaptive", app.adaptive)
             put("monochrome", app.monochrome)
             put("dir", dir)
@@ -209,8 +227,8 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
         append("- 图标尺寸：").append(options.size).append(" px\n")
         append("- 包含分层素材：").append(if (options.layers) "是" else "否").append('\n')
         append("- 应用数量：").append(count).append('\n')
-        append("- 应用目录：`未适配/<包名>/` 表示当前图标包里没有夜间素材，")
-        append("`已适配/<包名>/` 表示已有。\n\n")
+        append("- 应用目录：`未适配/` 表示没有暗色图标，`自适配/` 表示 APK 自己带夜间图标，")
+        append("`已适配/` 表示模块图标包里已有夜间前景。\n\n")
         append(README_BODY)
     }
 
@@ -229,8 +247,12 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
             |│   ├── mono.png           单色层（纯黑图形 + alpha）
             |│   ├── icon2.png          APK 自带夜间图（仅部分应用有）
             |│   └── raw/               APK 内的原始图标资源
-            |└── 已适配/<包名>/          同上（仅在勾选“导出已适配应用”时出现）
+            |├── 自适配/<包名>/          APK 自带夜间图标，模块未覆盖（结构同上）
+            |└── 已适配/<包名>/          模块图标包里已有夜间前景（仅在勾选“导出已适配应用”时出现）
             |```
+            |
+            |`自适配/` 里的应用在暗色模式下图标会自己变化（APK 提供了 `-night` 资源），
+            |模块不处理也不影响效果；若想统一成模块风格，可以按 `未适配/` 同样的流程补 `rec_night.png`。
             |
             |## 2. 每个 PNG 的用途
             |
