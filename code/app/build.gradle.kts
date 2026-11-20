@@ -3,10 +3,10 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-// versionCode 取 master 分支的 commit 数，取不到时回退为 1
+// versionCode 取当前提交所在分支的 commit 数，取不到时回退为 1
 fun gitCommitCount(): Int = runCatching {
     providers.exec {
-        commandLine("git", "rev-list", "--count", "master")
+        commandLine("git", "rev-list", "--count", "HEAD")
         workingDir = rootDir
     }.standardOutput.asText.get().trim().toInt()
 }.getOrDefault(1)
