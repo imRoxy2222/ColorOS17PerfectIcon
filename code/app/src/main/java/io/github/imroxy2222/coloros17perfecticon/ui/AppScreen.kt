@@ -1,5 +1,6 @@
 package io.github.imroxy2222.coloros17perfecticon.ui
 
+import android.app.WallpaperManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -22,6 +23,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -74,6 +76,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -84,6 +87,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.pm.PackageInfoCompat
+import androidx.core.graphics.ColorUtils
 import io.github.imroxy2222.coloros17perfecticon.R
 import io.github.imroxy2222.coloros17perfecticon.export.Exporter
 import io.github.imroxy2222.coloros17perfecticon.icon.AppItem
@@ -1014,6 +1018,9 @@ private fun AboutPage(modifier: Modifier = Modifier) {
 
 @Composable
 private fun FlowingIconBox(version: String, versionCode: String) {
+    val context = LocalContext.current
+    val dark = isSystemInDarkTheme()
+    val palette = remember(context, dark) { buildSmokePalette(context, dark) }
     val transition = rememberInfiniteTransition(label = "flow")
     fun spec(duration: Int) = infiniteRepeatable<Float>(
         animation = tween(durationMillis = duration, easing = LinearEasing),
@@ -1029,7 +1036,7 @@ private fun FlowingIconBox(version: String, versionCode: String) {
             .padding(horizontal = 12.dp)
             .aspectRatio(1f)
             .clip(RoundedCornerShape(28.dp))
-            .background(Color(0xFF0E1014)),
+            .background(palette.background),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(
@@ -1066,10 +1073,10 @@ private fun FlowingIconBox(version: String, versionCode: String) {
                     center = center,
                 )
             }
-            wisp(t1, 0.30f, 0.36f, 0.12f, 0.10f, 0.58f, Color.White.copy(alpha = 0.18f))
-            wisp(t2, 0.74f, 0.28f, 0.08f, 0.12f, 0.50f, Color(0xFF8FB4FF).copy(alpha = 0.22f))
-            wisp(t3, 0.56f, 0.74f, 0.13f, 0.08f, 0.62f, Color(0xFFB58CFF).copy(alpha = 0.18f))
-            wisp(t4, 0.22f, 0.80f, 0.10f, 0.09f, 0.46f, Color(0xFF7FE3FF).copy(alpha = 0.16f))
+            wisp(t1, 0.30f, 0.36f, 0.12f, 0.10f, 0.58f, palette.wisps[0])
+            wisp(t2, 0.74f, 0.28f, 0.08f, 0.12f, 0.50f, palette.wisps[1])
+            wisp(t3, 0.56f, 0.74f, 0.13f, 0.08f, 0.62f, palette.wisps[2])
+            wisp(t4, 0.22f, 0.80f, 0.10f, 0.09f, 0.46f, palette.highlight)
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
@@ -1095,3 +1102,34 @@ private fun FlowingIconBox(version: String, versionCode: String) {
 }
 
 private const val ABOUT_REPO = "github.com/imroxy2222/ColorOS17PerfectIcon"
+
+private class SmokePalette(val background: Color, val wisps: List<Color>, val highlight: Color)
+
+/**
+ * 从桌面壁纸取色（Material You 的壁纸种子色），转成适合深色卡片的烟雾颜色。
+ * 暗色模式提高明度与透明度，亮色模式稍微收敛一些。
+ */
+private fun buildSmokePalette(context: Context, dark: Boolean): SmokePalette {
+    val seeds = runCatching {
+        val manager = context.getSystemService(WallpaperManager::class.java)
+        manager?.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)?.let { colors ->
+            listOfNotNull(colors.primaryColor, colors.secondaryColor, colors.tertiaryColor)
+                .map { it.toArgb() }
+        }
+    }.getOrNull().orEmpty().ifEmpty {
+        listOf(0xFF7AA2FF.toInt(), 0xFFB58CFF.toInt(), 0xFF7FE3FF.toInt())
+    }
+    val wisps = seeds.take(3).map { themedSmokeColor(it, dark) }
+    val base = wisps.first()
+    val background = lerp(Color(0xFF0E1014), base.copy(alpha = 1f), if (dark) 0.18f else 0.10f)
+    val highlight = lerp(base, Color.White, 0.55f).copy(alpha = base.alpha)
+    return SmokePalette(background, wisps, highlight)
+}
+
+private fun themedSmokeColor(argb: Int, dark: Boolean): Color {
+    val hsl = FloatArray(3)
+    ColorUtils.colorToHSL(argb, hsl)
+    hsl[1] = hsl[1].coerceAtLeast(0.35f)
+    hsl[2] = if (dark) 0.74f else 0.68f
+    return Color(ColorUtils.HSLToColor(hsl)).copy(alpha = if (dark) 0.24f else 0.20f)
+}
