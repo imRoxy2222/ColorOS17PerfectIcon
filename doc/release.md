@@ -84,7 +84,9 @@ APK 由 Actions 构建并签名，密钥保存在仓库 Secrets 中。本机已�
 
 1. `actions/checkout` 且 **`fetch-depth: 0`**（并拉取全部 tag）—— versionCode 依赖完整提交历史，浅克隆会算成 1。
 2. 校验 tag：必须是数字，且必须存在上一个 tag（`N-1`）。
-3. 安装 JDK 17、Android SDK（`platforms;android-36`、`build-tools;36.0.0`）。
+3. 安装 JDK 17；Android SDK 直接用 Runner 预装的那份，只补装 `platforms;android-36`、
+   `build-tools;36.0.0`（不使用 `android-actions/setup-android`，该 action 会执行已废弃的
+   `sdkmanager tools` 而报错）。
 4. 把 `C17_KEYSTORE_B64` 解码到 `$RUNNER_TEMP/c17-release.jks`。
 5. `./gradlew :app:assembleRelease`，签名配置读取环境变量（见 `code/app/build.gradle.kts` 的 `signingConfigs`）。
 6. `apksigner verify` 校验签名，并把 APK 重命名为 `完美图标.apk`。
