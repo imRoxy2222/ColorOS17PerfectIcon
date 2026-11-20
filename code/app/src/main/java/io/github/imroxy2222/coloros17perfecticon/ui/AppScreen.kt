@@ -7,6 +7,8 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -94,7 +96,8 @@ import io.github.imroxy2222.coloros17perfecticon.export.Exporter
 import io.github.imroxy2222.coloros17perfecticon.icon.AdaptState
 import io.github.imroxy2222.coloros17perfecticon.icon.AppItem
 import io.github.imroxy2222.coloros17perfecticon.icon.IconExtractor
-import io.github.imroxy2222.coloros17perfecticon.icon.ThemeIconPack
+import io.github.imroxy2222.coloros17perfecticon.icon.ModuleIconStore
+import io.github.imroxy2222.coloros17perfecticon.icon.ModuleIconZip
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -137,6 +140,10 @@ class UiState {
     var tab by mutableStateOf(1)
     val selected = mutableStateMapOf<String, Boolean>()
 
+    var moduleName by mutableStateOf<String?>(null)
+    var modulePkgs by mutableStateOf<Set<String>>(emptySet())
+    var importing by mutableStateOf(false)
+
     var optIncludeAdapted by mutableStateOf(false)
     var optLayers by mutableStateOf(true)
     var optSize by mutableStateOf(1024)
@@ -161,6 +168,8 @@ fun AppScreen() {
     val state = remember { UiState() }
     val extractor = remember { IconExtractor(context) }
     val exporter = remember { Exporter(context, extractor) }
+    val moduleStore = remember { ModuleIconStore(context) }
+    val savedModule = remember { moduleStore.load() }
 
     var drawerOpen by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
@@ -179,8 +188,7 @@ fun AppScreen() {
         snapshot.filter { item ->
             val tabMatched = when (tab) {
                 1 -> item.state == AdaptState.NONE
-                2 -> item.state == AdaptState.SELF
-                3 -> item.state == AdaptState.MODULE
+                2 -> item.state == AdaptState.MODULE
                 else -> true
             }
             tabMatched && (query.isBlank() ||
@@ -191,6 +199,12 @@ fun AppScreen() {
 
     fun startScan() {
         if (state.scanning) return
+        val adapted = state.modulePkgs
+        if (adapted.isEmpty()) {
+            state.apps.clear()
+            state.selected.clear()
+            return
+        }
         state.scanning = true
         state.scanJob = scope.launch {
             state.apps.clear()
@@ -208,11 +222,10 @@ fun AppScreen() {
             }
             state.total = apps.size
 
-            val pack = withContext(Dispatchers.IO) { ThemeIconPack.load() }
             withContext(Dispatchers.IO) {
                 for ((index, app) in apps.withIndex()) {
                     if (!isActive) break
-                    val item = runCatching { extractor.detect(app, pack) }.getOrNull()
+                    val item = runCatching { extractor.detect(app, adapted) }.getOrNull()
                     withContext(Dispatchers.Main) {
                         if (item != null) state.apps.add(item)
                         state.scanned = index + 1
@@ -227,6 +240,47 @@ fun AppScreen() {
     fun pullRefresh() {
         state.refreshing = true
         startScan()
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        state.importing = true
+        state.scanError = null
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { ModuleIconZip.read(context, uri) }
+            }
+            state.importing = false
+            result.onSuccess { snapshot ->
+                if (snapshot.packages.isEmpty()) {
+                    state.scanError = "zip 里没有找到图标包目录，请确认选的是模块 zip"
+                    return@onSuccess
+                }
+                moduleStore.save(snapshot)
+                state.moduleName = snapshot.name
+                state.modulePkgs = snapshot.packages
+                state.message = "已导入 ${snapshot.packages.size} 个应用"
+                startScan()
+            }.onFailure {
+                state.scanError = "读取模块 zip 失败：${it.message ?: it}"
+            }
+        }
+    }
+
+    fun pickModuleZip() {
+        state.scanError = null
+        importLauncher.launch(arrayOf("application/zip", "application/octet-stream"))
+    }
+
+    fun clearModuleZip() {
+        moduleStore.clear()
+        state.moduleName = null
+        state.modulePkgs = emptySet()
+        state.apps.clear()
+        state.selected.clear()
+        state.scanned = 0
+        state.total = 0
+        state.message = null
     }
 
     fun toggle(pkg: String) {
@@ -297,17 +351,21 @@ fun AppScreen() {
         runCatching { context.startActivity(Intent.createChooser(intent, "分享 icon.zip")) }
     }
 
-    LaunchedEffect(Unit) { startScan() }
+    LaunchedEffect(Unit) {
+        savedModule?.let { snapshot ->
+            state.moduleName = snapshot.name
+            state.modulePkgs = snapshot.packages
+            startScan()
+        }
+    }
 
     val moduleCount = snapshot.count { it.state == AdaptState.MODULE }
-    val selfCount = snapshot.count { it.state == AdaptState.SELF }
     val summaryTitle = if (state.scanning) {
         "正在扫描 ${state.scanned} / ${state.total}"
     } else {
         "共 ${snapshot.size} 个应用"
     }
-    val summaryDetail =
-        "未适配 ${snapshot.size - moduleCount - selfCount} · 自适配 $selfCount\n已适配 $moduleCount"
+    val summaryDetail = "未适配 ${snapshot.size - moduleCount}\n已适配 $moduleCount"
     val selectedCount = state.selected.count { it.value }
     val exportCount = if (selectedCount > 0) selectedCount else filtered.size
     val pageLayer = rememberGraphicsLayer()
@@ -351,7 +409,7 @@ fun AppScreen() {
                                 minWidth = 0.dp,
                             ) {
                                 Column(Modifier.width(112.dp).padding(vertical = 8.dp)) {
-                                    listOf("全部", "未适配", "自适配", "已适配").forEachIndexed { index, label ->
+                                    listOf("全部", "未适配", "已适配").forEachIndexed { index, label ->
                                         Text(
                                             label,
                                             modifier = Modifier
@@ -419,6 +477,19 @@ fun AppScreen() {
 
                 Box(Modifier.fillMaxWidth().weight(1f).padding(top = 4.dp)) {
                     when {
+                        state.importing -> {
+                            EmptyState("正在读取模块 zip…")
+                        }
+
+                        state.modulePkgs.isEmpty() -> {
+                            EmptyState(
+                                state.scanError
+                                    ?: "先导入模块 zip，再按包内是否包含该应用判定已适配",
+                                action = "导入模块 zip",
+                                onAction = { pickModuleZip() },
+                            )
+                        }
+
                         filtered.isNotEmpty() -> {
                             PullToRefresh(
                                 isRefreshing = state.refreshing,
@@ -514,7 +585,7 @@ fun AppScreen() {
             exit = slideOutHorizontally { -it },
             modifier = Modifier.align(Alignment.CenterStart),
         ) {
-            OptionsDrawer(state = state)
+            OptionsDrawer(state = state, onImport = { pickModuleZip() }, onClear = { clearModuleZip() })
         }
     }
 }
@@ -575,7 +646,7 @@ private fun MoreDots() {
 }
 
 @Composable
-private fun OptionsDrawer(state: UiState) {
+private fun OptionsDrawer(state: UiState, onImport: () -> Unit, onClear: () -> Unit) {
     var confirmReset by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier
@@ -587,6 +658,38 @@ private fun OptionsDrawer(state: UiState) {
             .navigationBarsPadding()
             .verticalScroll(rememberScrollState()),
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "模块图标包",
+                style = MiuixTheme.textStyles.title3,
+                fontWeight = FontWeight.Medium,
+                color = MiuixTheme.colorScheme.onSurface,
+            )
+        }
+        HorizontalDivider()
+        Spacer(Modifier.height(8.dp))
+
+        BasicComponent(
+            title = "导入模块 zip",
+            summary = state.moduleName?.let { "$it · ${state.modulePkgs.size} 个应用" }
+                ?: "未导入，导入后按包内是否包含该应用判定已适配",
+            onClick = onImport,
+            insideMargin = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
+        )
+        if (state.moduleName != null) {
+            TextButton(
+                text = "清除已导入图标包",
+                onClick = onClear,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -607,7 +710,7 @@ private fun OptionsDrawer(state: UiState) {
             checked = state.optIncludeAdapted,
             onCheckedChange = { state.optIncludeAdapted = it },
             title = "导出已适配应用",
-            summary = "默认跳过模块里已有夜间图标的应用",
+            summary = "默认跳过模块 zip 里已包含的应用",
             insideMargin = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
         )
         SuperSwitch(
@@ -781,20 +884,6 @@ private fun StatusTag(state: AdaptState) {
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 color = MiuixTheme.colorScheme.onPrimaryContainer,
-            )
-        }
-
-        AdaptState.SELF -> Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.14f))
-                .padding(horizontal = 7.dp, vertical = 2.dp),
-        ) {
-            Text(
-                "自适配",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                color = MiuixTheme.colorScheme.primary,
             )
         }
 

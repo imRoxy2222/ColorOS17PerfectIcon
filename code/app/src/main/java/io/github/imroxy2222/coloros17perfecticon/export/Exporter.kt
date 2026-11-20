@@ -32,7 +32,6 @@ import java.util.zip.ZipOutputStream
  * icon.zip
  * ├── index.json
  * ├── 未适配/<包名>/appinfo.txt icon.png [bg.png fg.png mono.png] [raw/...]
- * ├── 自适配/<包名>/appinfo.txt icon.png icon2.png [bg.png fg.png mono.png]
  * └── 已适配/<包名>/appinfo.txt icon.png icon2.png [bg.png fg.png mono.png]
  */
 class Exporter(private val context: Context, private val extractor: IconExtractor) {
@@ -131,7 +130,6 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
     ): Boolean {
         val dir = when (app.state) {
             AdaptState.MODULE -> "已适配/"
-            AdaptState.SELF -> "自适配/"
             AdaptState.NONE -> "未适配/"
         } + app.pkg
         val files = mutableListOf<String>()
@@ -196,7 +194,6 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
                 "state",
                 when (app.state) {
                     AdaptState.MODULE -> "module"
-                    AdaptState.SELF -> "self"
                     AdaptState.NONE -> "none"
                 },
             )
@@ -238,8 +235,8 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
         append("- 图标尺寸：").append(options.size).append(" px\n")
         append("- 包含分层素材：").append(if (options.layers) "是" else "否").append('\n')
         append("- 应用数量：").append(count).append('\n')
-        append("- 应用目录：`未适配/` 表示没有暗色图标，`自适配/` 表示 APK 自己带夜间图标，")
-        append("`已适配/` 表示模块图标包里已有夜间前景。\n\n")
+        append("- 应用目录：`未适配/` 是导入的模块 zip 里没有的应用，")
+        append("`已适配/` 是模块 zip 里已包含的应用。\n\n")
         append(README_BODY)
     }
 
@@ -251,20 +248,20 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
             |icon.zip
             |├── README.md              本说明
             |├── index.json             清单：包名、名称、是否已适配、包含的文件
-            |├── 未适配/<包名>/
+            |├── 未适配/<包名>/          模块 zip 里没有该应用
             |│   ├── appinfo.txt        应用名称、版本、包名
             |│   ├── icon.png           整图，桌面实际显示效果（参考用）
             |│   ├── bg.png             背景层（底板）
             |│   ├── fg.png             前景层（图形，透明底）
             |│   ├── mono.png           单色层（纯黑图形 + alpha）
-            |│   ├── icon2.png          APK 自带夜间图（仅部分应用有）
             |│   └── raw/               APK 内的原始图标资源
-            |├── 自适配/<包名>/          APK 自带夜间图标，模块未覆盖（结构同上）
-            |└── 已适配/<包名>/          模块图标包里已有夜间前景（仅在勾选“导出已适配应用”时出现）
+            |└── 已适配/<包名>/          模块图标包里已包含该应用（仅在勾选“导出已适配应用”时出现）
+            |    ├── 其余文件同上
+            |    └── icon2.png          APK 自带夜间图（仅部分应用有）
             |```
             |
-            |`自适配/` 里的应用在暗色模式下图标会自己变化（APK 提供了 `-night` 资源），
-            |模块不处理也不影响效果；若想统一成模块风格，可以按 `未适配/` 同样的流程补 `rec_night.png`。
+            |`已适配/` 里的应用表示导入的模块 zip 中已经有该包名目录，一般不需要再处理；
+            |需要统一风格或补大图标时，仍可参考下面的流程调整。
             |
             |## 2. 每个 PNG 的用途
             |
