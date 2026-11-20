@@ -2,26 +2,43 @@ package io.github.imroxy2222.coloros17perfecticon.ui
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -32,14 +49,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import io.github.imroxy2222.coloros17perfecticon.export.Exporter
 import io.github.imroxy2222.coloros17perfecticon.icon.AppItem
 import io.github.imroxy2222.coloros17perfecticon.icon.IconExtractor
@@ -49,31 +69,38 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Checkbox
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
+import top.yukonga.miuix.kmp.basic.PopupPositionProvider
+import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
-import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.extra.SuperListPopup
+import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 class UiState {
     val apps = mutableStateListOf<AppItem>()
     var scanning by mutableStateOf(false)
+    var refreshing by mutableStateOf(false)
     var scanned by mutableStateOf(0)
     var total by mutableStateOf(0)
     var scanError by mutableStateOf<String?>(null)
 
-    var queryValue by mutableStateOf(TextFieldValue(""))
-    var tab by mutableStateOf(0)
+    var query by mutableStateOf("")
+    var tab by mutableStateOf(1)
     val selected = mutableStateMapOf<String, Boolean>()
 
-    var showOptions by mutableStateOf(false)
     var optIncludeAdapted by mutableStateOf(false)
     var optLayers by mutableStateOf(true)
     var optSize by mutableStateOf(1024)
@@ -88,8 +115,6 @@ class UiState {
 
     var scanJob: Job? = null
     var exportJob: Job? = null
-
-    val query: String get() = queryValue.text
 }
 
 @Composable
@@ -100,9 +125,18 @@ fun AppScreen() {
     val extractor = remember { IconExtractor(context) }
     val exporter = remember { Exporter(context, extractor) }
 
+    var drawerOpen by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
+
     val snapshot = state.apps.toList()
     val query = state.query
     val tab = state.tab
+    val listState = rememberLazyListState()
+    val showBackToTop by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 1 || listState.firstVisibleItemScrollOffset > 0
+        }
+    }
     val filtered = remember(snapshot, tab, query) {
         snapshot.filter { item ->
             val tabMatched = when (tab) {
@@ -118,8 +152,8 @@ fun AppScreen() {
 
     fun startScan() {
         if (state.scanning) return
+        state.scanning = true
         state.scanJob = scope.launch {
-            state.scanning = true
             state.apps.clear()
             state.selected.clear()
             state.scanned = 0
@@ -146,7 +180,13 @@ fun AppScreen() {
                 }
             }
             state.scanning = false
+            state.refreshing = false
         }
+    }
+
+    fun pullRefresh() {
+        state.refreshing = true
+        startScan()
     }
 
     fun toggle(pkg: String) {
@@ -177,7 +217,6 @@ fun AppScreen() {
             layers = state.optLayers,
             rootRaw = state.optRoot,
         )
-        state.showOptions = false
         state.exporting = true
         state.exportDone = 0
         state.exportTotal = targets.size
@@ -227,128 +266,320 @@ fun AppScreen() {
     val selectedCount = state.selected.count { it.value }
     val exportCount = if (selectedCount > 0) selectedCount else filtered.size
 
-    Scaffold(
-        topBar = {
-            SmallTopAppBar(
-                title = "完美图标",
-                actions = {
-                    TextButton(
-                        text = "重新扫描",
-                        onClick = { startScan() },
-                        enabled = !state.scanning && !state.exporting,
-                    )
-                },
-            )
-        },
-        bottomBar = {
-            BottomPanel(
-                state = state,
-                summary = summary,
-                exportCount = exportCount,
-                allFilteredSelected = allFilteredSelected,
-                onOptions = { state.showOptions = true },
-                onSelectAll = { toggleSelectAll() },
-                onExport = { startExport() },
-                onCancelExport = { state.exportJob?.cancel() },
-                onShare = { state.resultUri?.let { share(it) } },
-            )
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize(),
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp),
-            ) {
-                TextField(
-                    value = state.queryValue,
-                    onValueChange = { state.queryValue = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = "搜索应用名称或包名",
-                    useLabelAsPlaceholder = true,
-                )
-                Spacer(Modifier.height(8.dp))
-                TabRow(
-                    tabs = listOf("全部", "未适配", "已适配"),
-                    selectedTabIndex = state.tab,
-                    onTabSelected = { state.tab = it },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(4.dp))
-            }
-
-            Box(Modifier.fillMaxWidth().weight(1f)) {
-                when {
-                    filtered.isNotEmpty() -> {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            items(filtered, key = { it.pkg }) { item ->
-                                AppRow(
-                                    item = item,
-                                    selected = state.selected[item.pkg] == true,
-                                    onToggle = { toggle(item.pkg) },
-                                )
+    Box(Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                SmallTopAppBar(
+                    title = "完美图标",
+                    navigationIcon = {
+                        TextButton("选项", onClick = { drawerOpen = true })
+                    },
+                    actions = {
+                        Box {
+                            IconButton(onClick = { menuOpen = true }) {
+                                MoreDots()
+                            }
+                            SuperListPopup(
+                                show = menuOpen,
+                                alignment = PopupPositionProvider.Align.End,
+                                onDismissRequest = { menuOpen = false },
+                                minWidth = 0.dp,
+                            ) {
+                                Column(Modifier.width(112.dp).padding(vertical = 8.dp)) {
+                                    listOf("全部", "未适配", "已适配").forEachIndexed { index, label ->
+                                        Text(
+                                            label,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    state.tab = index
+                                                    menuOpen = false
+                                                }
+                                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                                            fontSize = MiuixTheme.textStyles.body1.fontSize,
+                                            color = if (state.tab == index) {
+                                                MiuixTheme.colorScheme.primary
+                                            } else {
+                                                MiuixTheme.colorScheme.onSurface
+                                            },
+                                        )
+                                    }
+                                }
                             }
                         }
-                    }
+                    },
+                )
+            },
+            bottomBar = {
+                BottomPanel(
+                    state = state,
+                    summary = summary,
+                    exportCount = exportCount,
+                    allFilteredSelected = allFilteredSelected,
+                    onSelectAll = { toggleSelectAll() },
+                    onExport = { startExport() },
+                    onCancelExport = { state.exportJob?.cancel() },
+                    onShare = { state.resultUri?.let { share(it) } },
+                )
+            },
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize(),
+            ) {
+                InputField(
+                    query = state.query,
+                    onQueryChange = { state.query = it },
+                    onSearch = {},
+                    expanded = false,
+                    onExpandedChange = {},
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    label = "搜索应用名称或包名",
+                )
 
-                    state.scanning -> {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
-                                "正在读取桌面图标…",
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            )
+                Box(Modifier.fillMaxWidth().weight(1f).padding(top = 4.dp)) {
+                    when {
+                        filtered.isNotEmpty() -> {
+                            PullToRefresh(
+                                isRefreshing = state.refreshing,
+                                onRefresh = { pullRefresh() },
+                                modifier = Modifier.fillMaxSize(),
+                                refreshTexts = listOf("", "", "", ""),
+                            ) {
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(horizontal = 12.dp),
+                                    insideMargin = PaddingValues(0.dp),
+                                ) {
+                                    LazyColumn(
+                                        modifier = Modifier.fillMaxSize(),
+                                        state = listState,
+                                        contentPadding = PaddingValues(vertical = 4.dp),
+                                    ) {
+                                        itemsIndexed(filtered, key = { _, item -> item.pkg }) { index, item ->
+                                            if (index > 0) {
+                                                HorizontalDivider(Modifier.padding(start = 70.dp))
+                                            }
+                                            AppRow(
+                                                item = item,
+                                                selected = state.selected[item.pkg] == true,
+                                                onToggle = { toggle(item.pkg) },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
-                    }
 
-                    else -> {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
+                        state.scanning -> {
+                            EmptyState("正在读取桌面图标…")
+                        }
+
+                        else -> {
+                            EmptyState(
                                 state.scanError ?: "没有符合条件的应用",
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                action = "重新扫描",
+                                onAction = { startScan() },
                             )
                         }
                     }
+
+                    BackToTopFab(
+                        visible = showBackToTop && filtered.isNotEmpty(),
+                        onClick = { scope.launch { listState.animateScrollToItem(0) } },
+                    )
                 }
             }
         }
-    }
 
-    if (state.showOptions) {
-        OptionsDialog(
-            state = state,
-            onDismiss = { state.showOptions = false },
-            onStart = { startExport() },
+        AnimatedVisibility(
+            visible = drawerOpen,
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.35f))
+                    .pointerInput(Unit) {
+                        detectTapGestures { drawerOpen = false }
+                    },
+            )
+        }
+
+        AnimatedVisibility(
+            visible = drawerOpen,
+            enter = slideInHorizontally { -it },
+            exit = slideOutHorizontally { -it },
+            modifier = Modifier.align(Alignment.CenterStart),
+        ) {
+            OptionsDrawer(state = state, onClose = { drawerOpen = false })
+        }
+    }
+}
+
+@Composable
+private fun BoxScope.BackToTopFab(visible: Boolean, onClick: () -> Unit) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(),
+        exit = fadeOut(),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(bottom = 16.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .shadow(6.dp, CircleShape)
+                .clip(CircleShape)
+                .background(MiuixTheme.colorScheme.surface)
+                .clickable(onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            BackToTopArrow()
+        }
+    }
+}
+
+@Composable
+private fun BackToTopArrow() {
+    val color = MiuixTheme.colorScheme.onSurfaceVariantActions
+    Canvas(Modifier.size(20.dp)) {
+        val stroke = 2.dp.toPx()
+        val tip = Offset(size.width / 2f, size.height * 0.18f)
+        drawLine(color, tip, Offset(size.width / 2f, size.height * 0.86f), stroke, StrokeCap.Round)
+        drawLine(color, tip, Offset(size.width * 0.2f, size.height * 0.48f), stroke, StrokeCap.Round)
+        drawLine(color, tip, Offset(size.width * 0.8f, size.height * 0.48f), stroke, StrokeCap.Round)
+    }
+}
+
+@Composable
+private fun MoreDots() {
+    val color = MiuixTheme.colorScheme.onSurfaceVariantActions
+    Canvas(Modifier.size(16.dp)) {
+        val radius = 1.6.dp.toPx()
+        val centerX = size.width / 2f
+        drawCircle(color, radius, Offset(centerX, radius))
+        drawCircle(color, radius, Offset(centerX, size.height / 2f))
+        drawCircle(color, radius, Offset(centerX, size.height - radius))
+    }
+}
+
+@Composable
+private fun OptionsDrawer(state: UiState, onClose: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxHeight()
+            .width(300.dp)
+            .clip(RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp))
+            .background(MiuixTheme.colorScheme.surface)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .verticalScroll(rememberScrollState()),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "导出选项",
+                style = MiuixTheme.textStyles.title3,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton("完成", onClick = onClose)
+        }
+        HorizontalDivider()
+        Spacer(Modifier.height(8.dp))
+
+        SuperSwitch(
+            checked = state.optIncludeAdapted,
+            onCheckedChange = { state.optIncludeAdapted = it },
+            title = "导出已适配应用",
+            summary = "默认只导出未适配应用",
+            insideMargin = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
         )
+        SuperSwitch(
+            checked = state.optLayers,
+            onCheckedChange = { state.optLayers = it },
+            title = "导出分层素材",
+            summary = "额外导出 bg / fg / mono 图层",
+            insideMargin = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
+        )
+        SuperSwitch(
+            checked = state.optRoot,
+            onCheckedChange = { state.optRoot = it },
+            title = "合并 APK 原始素材",
+            summary = "把 APK 内 ic_launcher 原图放进 raw/",
+            insideMargin = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
+        )
+
+        Spacer(Modifier.height(12.dp))
+        Text(
+            "图标尺寸",
+            style = MiuixTheme.textStyles.subtitle,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            modifier = Modifier.padding(horizontal = 20.dp),
+        )
+        Spacer(Modifier.height(8.dp))
+        TabRow(
+            tabs = listOf("256 px", "512 px", "1024 px"),
+            selectedTabIndex = when (state.optSize) {
+                256 -> 0
+                512 -> 1
+                else -> 2
+            },
+            onTabSelected = { state.optSize = listOf(256, 512, 1024)[it] },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+        )
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun EmptyState(
+    text: String,
+    action: String? = null,
+    onAction: () -> Unit = {},
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text,
+            style = MiuixTheme.textStyles.body2,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+        )
+        if (action != null) {
+            Spacer(Modifier.height(12.dp))
+            TextButton(text = action, onClick = onAction)
+        }
     }
 }
 
 @Composable
 private fun AppRow(item: AppItem, selected: Boolean, onToggle: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onToggle,
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    BasicComponent(
+        startAction = {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MiuixTheme.colorScheme.secondaryContainer),
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MiuixTheme.colorScheme.surfaceContainerHighest),
                 contentAlignment = Alignment.Center,
             ) {
-                val preview = item.preview
-                if (preview != null) {
+                item.preview?.let { preview ->
                     Image(
                         bitmap = preview,
                         contentDescription = null,
@@ -356,34 +587,57 @@ private fun AppRow(item: AppItem, selected: Boolean, onToggle: () -> Unit) {
                     )
                 }
             }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(item.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    item.pkg,
-                    fontSize = 12.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+        },
+        endActions = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                StatusTag(adapted = item.hasNight)
+                Spacer(Modifier.width(6.dp))
+                Checkbox(
+                    state = ToggleableState(selected),
+                    onClick = onToggle,
                 )
             }
-            Spacer(Modifier.width(8.dp))
+        },
+        onClick = onToggle,
+    ) {
+        Text(
+            item.label,
+            modifier = Modifier.basicMarquee(),
+            maxLines = 1,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            item.pkg,
+            modifier = Modifier.basicMarquee(),
+            fontSize = 12.sp,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun StatusTag(adapted: Boolean) {
+    if (adapted) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(MiuixTheme.colorScheme.primaryContainer)
+                .padding(horizontal = 7.dp, vertical = 2.dp),
+        ) {
             Text(
-                if (item.hasNight) "已适配" else "未适配",
+                "已适配",
                 fontSize = 11.sp,
-                color = if (item.hasNight) {
-                    MiuixTheme.colorScheme.primary
-                } else {
-                    MiuixTheme.colorScheme.onSurfaceVariantSummary
-                },
-            )
-            Spacer(Modifier.width(2.dp))
-            Checkbox(
-                checked = selected,
-                onCheckedChange = { onToggle() },
+                fontWeight = FontWeight.Medium,
+                color = MiuixTheme.colorScheme.onPrimaryContainer,
             )
         }
+    } else {
+        Text(
+            "未适配",
+            fontSize = 11.sp,
+            color = MiuixTheme.colorScheme.error,
+        )
     }
 }
 
@@ -393,7 +647,6 @@ private fun BottomPanel(
     summary: String,
     exportCount: Int,
     allFilteredSelected: Boolean,
-    onOptions: () -> Unit,
     onSelectAll: () -> Unit,
     onExport: () -> Unit,
     onCancelExport: () -> Unit,
@@ -405,153 +658,94 @@ private fun BottomPanel(
             .navigationBarsPadding()
             .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.fillMaxWidth()) {
-                when {
-                    state.scanning -> {
-                        Text(summary, fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-                        LinearProgressIndicator(
-                            progress = if (state.total > 0) state.scanned.toFloat() / state.total else 0f,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-                        )
-                    }
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            insideMargin = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+        ) {
+            when {
+                state.scanning -> {
+                    Text(
+                        summary,
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                    LinearProgressIndicator(
+                        progress = if (state.total > 0) state.scanned.toFloat() / state.total else 0f,
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                    )
+                }
 
-                    state.exporting -> {
+                state.exporting -> {
+                    Text(
+                        state.exportLabel.ifEmpty { "准备中…" },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    LinearProgressIndicator(
+                        progress = if (state.exportTotal > 0) {
+                            state.exportDone.toFloat() / state.exportTotal
+                        } else {
+                            0f
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Text(
-                            state.exportLabel.ifEmpty { "准备中…" },
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                            "${state.exportDone} / ${state.exportTotal}",
+                            style = MiuixTheme.textStyles.footnote1,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
-                        LinearProgressIndicator(
-                            progress = if (state.exportTotal > 0) {
-                                state.exportDone.toFloat() / state.exportTotal
-                            } else {
-                                0f
-                            },
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-                        )
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "${state.exportDone} / ${state.exportTotal}",
-                                fontSize = 12.sp,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            )
-                            Spacer(Modifier.weight(1f))
-                            TextButton("取消", onClick = onCancelExport)
-                        }
+                        Spacer(Modifier.weight(1f))
+                        TextButton("取消", onClick = onCancelExport)
                     }
+                }
 
-                    else -> {
-                        Text(summary, fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-                        state.message?.let {
-                            Spacer(Modifier.height(4.dp))
-                            Text(it, fontSize = 13.sp)
-                        }
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            TextButton("选项", onClick = onOptions)
-                            TextButton(if (allFilteredSelected) "取消全选" else "全选", onClick = onSelectAll)
-                            Spacer(Modifier.weight(1f))
-                            if (state.resultUri != null) {
-                                TextButton("分享", onClick = onShare)
-                            }
-                        }
+                else -> {
+                    Text(
+                        summary,
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                    state.message?.let {
                         Spacer(Modifier.height(4.dp))
+                        Text(it, style = MiuixTheme.textStyles.footnote1)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        TextButton(
+                            text = if (allFilteredSelected) "取消全选" else "全选",
+                            onClick = onSelectAll,
+                            modifier = Modifier.weight(1f),
+                        )
                         Button(
                             onClick = onExport,
                             enabled = exportCount > 0,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                color = MiuixTheme.colorScheme.primary,
+                                contentColor = MiuixTheme.colorScheme.onPrimary,
+                            ),
                         ) {
-                            Text("导出 $exportCount 个应用")
+                            Text("导出")
+                        }
+                    }
+                    if (state.resultUri != null) {
+                        Box(Modifier.fillMaxWidth()) {
+                            TextButton(
+                                "分享",
+                                onClick = onShare,
+                                modifier = Modifier.align(Alignment.CenterEnd),
+                            )
                         }
                     }
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun OptionsDialog(
-    state: UiState,
-    onDismiss: () -> Unit,
-    onStart: () -> Unit,
-) {
-    val sizes = remember { listOf(256, 512, 1024) }
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Card(Modifier.fillMaxWidth()) {
-                Text("导出设置", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
-                OptionSwitchRow(
-                    title = "导出已适配应用",
-                    summary = "默认关闭，只导出没有暗色图标的应用",
-                    checked = state.optIncludeAdapted,
-                    onCheckedChange = { state.optIncludeAdapted = it },
-                )
-                OptionSwitchRow(
-                    title = "导出分层素材",
-                    summary = "额外导出 bg.png / fg.png / mono.png",
-                    checked = state.optLayers,
-                    onCheckedChange = { state.optLayers = it },
-                )
-                OptionSwitchRow(
-                    title = "合并 APK 原始素材",
-                    summary = "把 APK 内的 ic_launcher 原图放进 raw/，读不到会自动跳过",
-                    checked = state.optRoot,
-                    onCheckedChange = { state.optRoot = it },
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "图标尺寸",
-                    fontSize = 13.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                )
-                Spacer(Modifier.height(6.dp))
-                TabRow(
-                    tabs = sizes.map { "$it px" },
-                    selectedTabIndex = sizes.indexOf(state.optSize).coerceAtLeast(0),
-                    onTabSelected = { state.optSize = sizes[it] },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(12.dp))
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton("取消", onClick = onDismiss)
-                    Spacer(Modifier.weight(1f))
-                    Button(onClick = onStart) {
-                        Text("开始导出")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun OptionSwitchRow(
-    title: String,
-    summary: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(title)
-            Text(
-                summary,
-                fontSize = 12.sp,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            )
-        }
-        Spacer(Modifier.width(8.dp))
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }

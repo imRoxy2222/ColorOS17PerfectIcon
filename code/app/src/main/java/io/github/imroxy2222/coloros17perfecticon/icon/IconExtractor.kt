@@ -66,7 +66,7 @@ class IconExtractor(context: Context) {
             hasNight = hasNight,
             adaptive = adaptiveIcon != null,
             monochrome = adaptiveIcon?.let { hasMonochrome(it) } ?: false,
-            preview = (dayBitmap ?: nightBitmap)?.asImageBitmap(),
+            preview = (day ?: night)?.let { renderPreview(it, PREVIEW_SIZE) }?.asImageBitmap(),
         )
     }
 
@@ -149,6 +149,10 @@ class IconExtractor(context: Context) {
 
     private fun renderSafe(drawable: Drawable, size: Int): Bitmap? =
         runCatching { renderComposite(drawable, size) }.getOrNull()
+
+    /** 列表预览：不放大裁切，完整绘制图标的原始范围。 */
+    private fun renderPreview(drawable: Drawable, size: Int): Bitmap? =
+        runCatching { renderLayer(drawable, size) }.getOrNull()
 
     private companion object {
         const val PREVIEW_SIZE = 160
