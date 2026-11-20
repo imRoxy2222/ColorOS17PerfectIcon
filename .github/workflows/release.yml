@@ -3,7 +3,8 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      # 版本 tag 为纯数字（1、2、3 …），由“校验版本号”步骤把关
+      - "*"
   workflow_dispatch:
 
 permissions:
@@ -24,6 +25,24 @@ jobs:
         with:
           # versionCode 取的是 commit 数，必须拉完整历史
           fetch-depth: 0
+          # 需要校验上一个 tag 是否存在
+          fetch-tags: true
+
+      - name: 校验版本号
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if ! [[ "$TAG" =~ ^[0-9]+$ ]] || [ "$TAG" -lt 1 ]; then
+            echo "::error::tag 必须是纯数字版本号（1、2、3 …），当前为 $TAG"
+            exit 1
+          fi
+          if [ "$TAG" -gt 1 ]; then
+            PREV=$((TAG - 1))
+            if ! git rev-parse -q --verify "refs/tags/$PREV" >/dev/null; then
+              echo "::error::缺少上一个版本 tag：$PREV，请按顺序发版"
+              exit 1
+            fi
+          fi
 
       - name: 配置 JDK 17
         uses: actions/setup-java@v4

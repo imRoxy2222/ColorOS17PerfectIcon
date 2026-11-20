@@ -42,20 +42,21 @@ APK 由 Actions 构建并签名，密钥保存在仓库 Secrets 中。本机已�
 
 ## 2. 日常发版
 
-1. **改版本号**（只有两处需要手动改）：
-   - `module.prop` 的 `version=` 和 `versioncode=`，例如 `16.2.9`
-   - `code/app/build.gradle.kts` 的 `versionName = "1.0"`（想跟随模块版本就改成 `16.2.9`）
-   - `versionCode` **不要手改**，构建时自动取 `git rev-list --count HEAD`，随提交数递增。
+1. **版本号规则**：
+   - APP 的 `versionName` 固定为 `1.0`，`versionCode` 自动取 `git rev-list --count HEAD`，两处都不要手改；
+   - `module.prop` 的 `version=` / `versioncode=` 建议改成本次 tag 号，方便 Magisk 管理器里显示（不参与产物命名）。
 2. 提交并推送到 `master`。
-3. 打 tag，tag 名与模块版本保持一致（推荐 `v` + 版本号）：
+3. 打 tag。tag 是**纯数字**，从 `1` 开始依次递增（`1`、`2`、`3` …），不是 `v16.2.9` 这种：
 
    ```bash
-   git tag v16.2.9
+   git tag 6
    git push origin master
-   git push origin v16.2.9
+   git push origin 6
    ```
 
-   推送 tag 后会自动触发 `.github/workflows/release.yml`。
+   推送 tag 后会自动触发 `.github/workflows/release.yml`。流水线会先校验：
+   - tag 必须是数字且 ≥ 1；
+   - 打 tag `N` 时，仓库里必须已经存在 tag `N-1`（例如打 `6` 必须先有 `5`），否则直接失败，不会创建 Release。
 
 4. 打开仓库 **Actions → Release** 查看进度；完成后 **Releases** 页面会出现新版本，包含：
 
@@ -76,14 +77,15 @@ APK 由 Actions 构建并签名，密钥保存在仓库 Secrets 中。本机已�
 
 ## 3. 流水线做了什么
 
-1. `actions/checkout` 且 **`fetch-depth: 0`** —— versionCode 依赖完整提交历史，浅克隆会算成 1。
-2. 安装 JDK 17、Android SDK（`platforms;android-36`、`build-tools;36.0.0`）。
-3. 把 `C17_KEYSTORE_B64` 解码到 `$RUNNER_TEMP/c17-release.jks`。
-4. `./gradlew :app:assembleRelease`，签名配置读取环境变量（见 `code/app/build.gradle.kts` 的 `signingConfigs`）。
-5. `apksigner verify` 校验签名，并把 APK 重命名为 `完美图标.apk`。
-6. 统计 `my_product/media/theme/uxicons/hdpi/` 覆盖的包名数，用 `python3 build.py`
+1. `actions/checkout` 且 **`fetch-depth: 0`**（并拉取全部 tag）—— versionCode 依赖完整提交历史，浅克隆会算成 1。
+2. 校验 tag：必须是数字，且必须存在上一个 tag（`N-1`）。
+3. 安装 JDK 17、Android SDK（`platforms;android-36`、`build-tools;36.0.0`）。
+4. 把 `C17_KEYSTORE_B64` 解码到 `$RUNNER_TEMP/c17-release.jks`。
+5. `./gradlew :app:assembleRelease`，签名配置读取环境变量（见 `code/app/build.gradle.kts` 的 `signingConfigs`）。
+6. `apksigner verify` 校验签名，并把 APK 重命名为 `完美图标.apk`。
+7. 统计 `my_product/media/theme/uxicons/hdpi/` 覆盖的包名数，用 `python3 build.py`
    打包模块 zip（自动排除 `code/`、`doc/`、`dist/`、`.github/`）。
-7. 用 `softprops/action-gh-release` 创建 Release 并附加两个文件。
+8. 用 `softprops/action-gh-release` 创建 Release 并附加两个文件。
 
 ---
 
@@ -111,6 +113,7 @@ cd .. && python3 build.py            # 产物：dist/ColorOSart-<version>.zip
 - **Gradle 下载慢/失败**：wrapper 使用腾讯镜像，依赖走阿里云镜像（`code/settings.gradle.kts`）。
   若镜像不可用，可把 `distributionUrl` 换成 `https://services.gradle.org/distributions/...`。
 - **`SigningConfig` 找不到 / APK 未签名**：确认 4 个 secret 都已添加，且名字与 workflow 中一致。
-- **Release 没有生成**：确认推送的是 tag（`refs/tags/v*`）而不是普通分支提交。
+- **Release 没有生成**：确认推送的是数字 tag（如 `6`）而不是普通分支提交；并确认上一个 tag
+  （`5`）已经存在，版本号必须连续。
 - **模块 zip 里混入了多余文件**：检查 `build.py` 的 `EXCLUDE_DIRS` / `EXCLUDE_FILES`，
   不要把它们放在需要打包的目录里；新增顶层目录时记得同步排除。

@@ -1,0 +1,122 @@
+# 新增适配软件
+
+给一个新应用补图标，需要做两件事：**画素材**（一个目录 + 若干 PNG）和**登记**（三个 XML）。
+本页以包名 `com.example.app` 为例。
+
+> 图标文件命名、尺寸、颜色规范的完整说明见 [icon-spec.md](icon-spec.md)，
+> 本页只讲“新增一个应用要改哪些地方”。
+
+---
+
+## 1. 新建素材目录
+
+```
+my_product/media/theme/uxicons/hdpi/com.example.app/
+```
+
+目录名就是包名。也支持两种特殊写法：
+
+| 目录名 | 用途 |
+| --- | --- |
+| `com.example.app` | 最常见，作用于整个应用 |
+| `com.example.app.ui.LaunchActivity` | 只替换该 Activity 的桌面入口（包名不能单独维护时用） |
+| `A和B` | 一个图标同时适配两个包名 |
+
+> `plus.*`、`temp_*`、`*.bak`、`.trashed*` 是主题商店/临时/残留目录，不要放素材。
+
+## 2. 放入 PNG 素材
+
+最小可用集合是 3 张 240×240：`recbg.png`、`recfg.png`、`rec_night.png`。
+
+| 文件 | 内容 | 说明 |
+| --- | --- | --- |
+| `recbg.png` | 不透明底板，铺满 240×240 | 形状由桌面裁切，不要自己画圆角 |
+| `recfg.png` | 透明底 + 前景图形 | 叠在底板上，白/浅色图形为主 |
+| `rec_night.png` | 透明底 + 暗色模式前景 | **不能**直接复制 `recfg.png`，否则判定为未适配 |
+
+推荐同时提供大图标与单色版本（可选，但桌面大图标/单色风格需要）：
+
+| 文件 | 尺寸 |
+| --- | --- |
+| `recbg_1x2` / `recfg_1x2` / `rec_night_1x2` | 240×820 |
+| `recbg_2x1` / `recfg_2x1` / `rec_night_2x1` | 820×240 |
+| `recbg_2x2` / `recfg_2x2` / `rec_night_2x2` | 704×704 |
+| `monochrome`（+ `_1x2/_2x1/_2x2`） | 同尺寸，黑色图形 + alpha |
+
+文件权限不用手改，模块安装时会统一设为 0777。
+
+## 3. 登记到三个 XML
+
+这三个文件都是一行一个条目，直接按行插入即可（插入后仍保持一行一条）。
+
+### 3.1 `my_product/media/theme/allApps.xml`
+
+图标名 ↔ 包名的映射。第三方应用直接用包名作 `name`：
+
+```xml
+<icon name="com.example.app" package="com.example.app" />
+```
+
+系统应用或热门应用通常复用主题图标资源名，例如：
+
+```xml
+<icon name="ic_launcher_tencent_mm.png" package="com.tencent.mm" />
+```
+
+### 3.2 `my_product/media/theme/drawableMapping.xml`
+
+参与图标重绘的包名清单：
+
+```xml
+<item package="com.example.app"/>
+```
+
+### 3.3 `my_product/media/theme/uxicons/hdpi/morph_icons_whitelist.xml`
+
+大图标（1×2 / 2×1 / 2×2、变形图标）白名单。只有当应用提供了大图标素材、
+且希望它支持变形图标时才需要加：
+
+```xml
+<package_name>com.example.app<morph>1</morph></package_name>
+```
+
+上游条目可能还带 `<shortcut>1</shortcut>`（快捷方式也重绘）和
+`<fg_redraw>1</fg_redraw>`（前台重绘），按需添加：
+
+```xml
+<package_name>com.example.app<morph>1</morph><shortcut>1</shortcut></package_name>
+```
+
+### 不需要改的
+
+- `my_product/media/theme/icon_version.xml`：uxicons 资源版本号，由官方主题控制，
+  新增图标不需要动。
+- `.nomedia`：保持原样。
+
+## 4. 验证
+
+```bash
+python3 build.py                 # 打包模块
+```
+
+刷入模块（或重启）后检查：
+
+```bash
+adb shell ls /data/oplus/uxicons/com.example.app
+# 应能看到 recbg.png / recfg.png / rec_night.png ...
+```
+
+- 桌面图标没变化时，重启一次桌面（`adb shell am force-stop com.android.launcher`，
+  或直接重启手机）。
+- 用「完美图标」应用搜索该包名，应显示为**已适配**。
+  如果显示未适配，检查 `rec_night.png` 是否只是 `recfg.png` 的副本
+  （两者内容相同会被判为未适配）。
+
+## 5. 常见问题
+
+- **图标亮了但形状不对**：`recbg` 必须是铺满画布的不透明底板，圆角/形状交给桌面裁切。
+- **暗色模式没生效**：`rec_night.png` 缺失或与 `recfg.png` 完全相同。
+- **大图标还是旧样式**：确认 `_1x2/_2x1/_2x2` 三组文件齐全，且已加入
+  `morph_icons_whitelist.xml`；必要时重启桌面。
+- **只改了 PNG 没生效**：确认包名没有拼错，且 `allApps.xml`、`drawableMapping.xml`
+  里都有对应条目；用上面的 `ls` 确认文件真的同步到了 `/data/oplus/uxicons/`。

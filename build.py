@@ -32,7 +32,7 @@ EXCLUDE_DIRS = {
 
 # 指定文件名跳过
 EXCLUDE_FILES = {
-    ".gitignore", ".DS_Store", "Thumbs.db", "desktop.ini", "build.py",
+    ".gitignore", ".DS_Store", "Thumbs.db", "desktop.ini", "build.py", "README.md",
 }
 
 # 按扩展名跳过；uxicons.zip 例外（uninstall.sh 需要它）
