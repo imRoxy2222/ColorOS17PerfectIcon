@@ -73,6 +73,7 @@ import io.github.imroxy2222.coloros17perfecticon.R
 import io.github.imroxy2222.coloros17perfecticon.export.Exporter
 import io.github.imroxy2222.coloros17perfecticon.icon.AppItem
 import io.github.imroxy2222.coloros17perfecticon.icon.IconExtractor
+import io.github.imroxy2222.coloros17perfecticon.icon.ThemeIconPack
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -151,8 +152,8 @@ fun AppScreen() {
     val filtered = remember(snapshot, tab, query) {
         snapshot.filter { item ->
             val tabMatched = when (tab) {
-                1 -> !item.hasNight
-                2 -> item.hasNight
+                1 -> !item.adapted
+                2 -> item.adapted
                 else -> true
             }
             tabMatched && (query.isBlank() ||
@@ -180,10 +181,11 @@ fun AppScreen() {
             }
             state.total = apps.size
 
+            val pack = withContext(Dispatchers.IO) { ThemeIconPack.load() }
             withContext(Dispatchers.IO) {
                 for ((index, app) in apps.withIndex()) {
                     if (!isActive) break
-                    val item = runCatching { extractor.detect(app) }.getOrNull()
+                    val item = runCatching { extractor.detect(app, pack) }.getOrNull()
                     withContext(Dispatchers.Main) {
                         if (item != null) state.apps.add(item)
                         state.scanned = index + 1
@@ -268,7 +270,7 @@ fun AppScreen() {
 
     LaunchedEffect(Unit) { startScan() }
 
-    val adaptedCount = snapshot.count { it.hasNight }
+    val adaptedCount = snapshot.count { it.adapted }
     val summary = if (state.scanning) {
         "正在扫描 ${state.scanned} / ${state.total}"
     } else {
@@ -619,7 +621,7 @@ private fun AppRow(item: AppItem, selected: Boolean, onToggle: () -> Unit) {
         },
         endActions = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                StatusTag(adapted = item.hasNight)
+                StatusTag(adapted = item.adapted)
                 Spacer(Modifier.width(6.dp))
                 Checkbox(
                     state = ToggleableState(selected),

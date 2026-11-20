@@ -10,6 +10,7 @@ import android.graphics.Canvas
 import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
 import androidx.compose.ui.graphics.asImageBitmap
+import java.io.File
 import kotlin.math.max
 
 /**
@@ -17,8 +18,7 @@ import kotlin.math.max
  *
  * 不需要 root / Xposed：
  * - 桌面入口用 ACTION_MAIN + CATEGORY_LAUNCHER 查询；
- * - 图标用资源 ID 加载，同一个 ID 分别在日间/夜间 Configuration 下渲染后比较，
- *   以此判断应用是否提供了 night 图标资源。
+ * - 是否“已适配”以 ColorOS 主题图标包（uxicons）为准，见 [ThemeIconPack]。
  */
 class IconExtractor(context: Context) {
 
@@ -52,21 +52,17 @@ class IconExtractor(context: Context) {
         return map.values.sortedBy { it.label.lowercase() }
     }
 
-    fun detect(app: LauncherApp): AppItem {
-        val day = loadIcon(app.pkg, app.iconRes, night = false)
-        val night = loadIcon(app.pkg, app.iconRes, night = true)
-        val dayBitmap = day?.let { renderSafe(it, PREVIEW_SIZE) }
-        val nightBitmap = night?.let { renderSafe(it, PREVIEW_SIZE) }
-        val hasNight = dayBitmap != null && nightBitmap != null && !dayBitmap.sameAs(nightBitmap)
-        val adaptiveIcon = (day as? AdaptiveIconDrawable) ?: (night as? AdaptiveIconDrawable)
+    fun detect(app: LauncherApp, pack: ThemeIconPack): AppItem {
+        val icon = loadIcon(app.pkg, app.iconRes, night = false)
+        val adaptiveIcon = icon as? AdaptiveIconDrawable
         return AppItem(
             pkg = app.pkg,
             label = app.label,
             iconRes = app.iconRes,
-            hasNight = hasNight,
+            adapted = pack.hasNightIcon(app.pkg),
             adaptive = adaptiveIcon != null,
             monochrome = adaptiveIcon?.let { hasMonochrome(it) } ?: false,
-            preview = (day ?: night)?.let { renderPreview(it, PREVIEW_SIZE) }?.asImageBitmap(),
+            preview = icon?.let { renderPreview(it, PREVIEW_SIZE) }?.asImageBitmap(),
         )
     }
 
@@ -147,9 +143,6 @@ class IconExtractor(context: Context) {
         return hasVisiblePixels(bitmap)
     }
 
-    private fun renderSafe(drawable: Drawable, size: Int): Bitmap? =
-        runCatching { renderComposite(drawable, size) }.getOrNull()
-
     /** 列表预览：不放大裁切，完整绘制图标的原始范围。 */
     private fun renderPreview(drawable: Drawable, size: Int): Bitmap? =
         runCatching { renderLayer(drawable, size) }.getOrNull()
@@ -157,5 +150,93 @@ class IconExtractor(context: Context) {
     private companion object {
         const val PREVIEW_SIZE = 160
         const val HIGH_DENSITY = 640
+    }
+}
+
+/**
+ * ColorOS 主题图标包（uxicons）。
+ *
+ * 桌面显示的第三方图标大多来自这里，而不是 APK 自身：
+ * - 模块素材：`/my_product/media/theme/uxicons/<density>/<包名>/`
+ * - 安装后生效：`/data/oplus/uxicons/<包名>/`
+ *
+ * 一个应用“已适配”的判据是：目录存在，并且含有与日间前景（recfg.png）不同的
+ * 暗色前景 rec_night.png。只有目录存在但暗夜前景与日间完全相同（很多应用是直接
+ * 复制的）时，夜间仍然显示原图，视为未适配。
+ */
+class ThemeIconPack private constructor(
+    private val dirs: Map<String, List<File>>,
+) {
+    private val nightCache = HashMap<String, Boolean>()
+
+    /** 图标包里的应用数量，为 0 说明路径不可读。 */
+    val size: Int get() = dirs.size
+
+    fun hasNightIcon(pkg: String): Boolean {
+        dirs[pkg]?.let { return nightOf(it) }
+        // 包名 + Activity 形式的目录，例如 com.xt.retouch.uilauncher.LaunchActivity
+        val prefix = "$pkg."
+        for ((name, list) in dirs) {
+            if (name.startsWith(prefix)) return nightOf(list)
+        }
+        return false
+    }
+
+    private fun nightOf(dirsOfPkg: List<File>): Boolean = dirsOfPkg.any { dir ->
+        synchronized(nightCache) {
+            nightCache.getOrPut(dir.absolutePath) { computeNight(dir) }
+        }
+    }
+
+    private fun computeNight(dir: File): Boolean {
+        val night = File(dir, "rec_night.png")
+        if (!night.isFile) return false
+        val day = File(dir, "recfg.png")
+        if (!day.isFile) return true
+        return runCatching { !night.readBytes().contentEquals(day.readBytes()) }.getOrDefault(false)
+    }
+
+    companion object {
+        private val ROOTS = listOf(
+            "/my_product/media/theme/uxicons",
+            "/data/oplus/uxicons",
+        )
+        private val DENSITY = Regex("(?:l|m|h|xh|xxh|xxxh|no|any)dpi")
+
+        fun load(): ThemeIconPack {
+            val map = LinkedHashMap<String, MutableList<File>>()
+            for (path in ROOTS) {
+                val root = File(path)
+                if (!root.isDirectory) continue
+                for (dir in packageDirs(root)) {
+                    val name = dir.name
+                    when {
+                        // 主题商店的哈希资源 ID，无法映射到包名
+                        name.startsWith("plus.") -> Unit
+                        // 一个目录同时适配多个包名
+                        name.contains('和') -> name.split('和')
+                            .filter { it.isNotBlank() }
+                            .forEach { map.getOrPut(it) { mutableListOf() } += dir }
+                        else -> map.getOrPut(name) { mutableListOf() } += dir
+                    }
+                }
+            }
+            return ThemeIconPack(map)
+        }
+
+        /** 展开 density 这一层，并跳过临时/备份目录。 */
+        private fun packageDirs(root: File): List<File> {
+            val children = root.listFiles()?.filter { it.isDirectory } ?: return emptyList()
+            return children.flatMap { child ->
+                if (DENSITY.matches(child.name)) {
+                    child.listFiles()?.filter { it.isDirectory } ?: emptyList()
+                } else {
+                    listOf(child)
+                }
+            }.filter { dir ->
+                val name = dir.name
+                !name.startsWith("temp") && !name.startsWith(".") && !name.endsWith(".bak")
+            }
+        }
     }
 }

@@ -46,7 +46,7 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
         options: Options,
         onProgress: (done: Int, total: Int, label: String) -> Unit,
     ): Result = withContext(Dispatchers.IO) {
-        val targets = if (options.includeAdapted) apps else apps.filter { !it.hasNight }
+        val targets = if (options.includeAdapted) apps else apps.filter { !it.adapted }
         val skipped = apps.size - targets.size
         val rawAssets = if (options.rootRaw) RawAssets(context) else null
 
@@ -106,7 +106,7 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
         rawAssets: RawAssets?,
         index: JSONArray,
     ): Boolean {
-        val dir = (if (app.hasNight) "已适配/" else "未适配/") + app.pkg
+        val dir = (if (app.adapted) "已适配/" else "未适配/") + app.pkg
         val files = mutableListOf<String>()
 
         val dayIcon = extractor.loadIcon(app.pkg, app.iconRes, night = false)
@@ -132,7 +132,7 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
             }
         }
 
-        if (app.hasNight) {
+        if (app.adapted) {
             val nightIcon = extractor.loadIcon(app.pkg, app.iconRes, night = true)
             if (nightIcon != null) {
                 runCatching { extractor.renderComposite(nightIcon, options.size) }.getOrNull()?.let {
@@ -154,7 +154,7 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
         index.put(JSONObject().apply {
             put("package", app.pkg)
             put("label", app.label)
-            put("hasNight", app.hasNight)
+            put("adapted", app.adapted)
             put("adaptive", app.adaptive)
             put("monochrome", app.monochrome)
             put("dir", dir)
