@@ -1,0 +1,334 @@
+# ColorOS 图标规范（主题图标 / ART+ / uxicons）
+
+本文档说明 ColorOS 桌面图标的官方要求，以及本 Magisk 模块所用 `/data/oplus/uxicons` 图标库的文件命名规则。
+内容依据：OPPO 开放平台主题文档、ColorOS 官方支持页，以及对本仓库 `my_product/media/theme/uxicons/hdpi` 中 2817 个应用目录、13575 张 PNG 的实际测量。
+
+---
+
+## 1. 先搞清楚三套图标体系
+
+ColorOS 桌面上看到的图标，可能来自三个不同的来源，命名方式完全不同：
+
+| 体系 | 存放位置 | 命名方式 | 说明 |
+|---|---|---|---|
+| 主题图标（icons 模块） | `icons/res/drawable-xxhdpi/` + `allApps.xml` | `ic_launcher_xxx.png` / `launcher_包名.png` | 主题商店流通的图标包，官方规范最完整 |
+| ART+ / 系统图标缓存 | `/data/oplus/uxicons/<包名>/` | `recbg.png`、`recfg.png` 等 | 本模块实际替换的对象，按包名分目录 |
+| 应用自带图标 | APK 内 `mipmap-*` | 由应用决定 | 未被上面两套覆盖时使用 |
+
+> ART+ 是 ColorOS 7 引入的第三方图标重绘方案：OPPO 设计师重绘头部应用图标，并把图标拆成“背景层 + 前景层”，由桌面按当前图标形状（矩形 / 鹅卵石 / 圆形等）实时裁切，所以同一套素材能适配所有图标风格。
+
+---
+
+## 2. 官方主题图标规范（桌面 → 图标 SKU）
+
+### 2.1 模块结构
+
+```
+icons/                        ← 图标模块（打包进主题时是一个无扩展名文件）
+├── allApps.xml               ← 图标文件名 ↔ 应用包名 的映射表
+├── res/
+│   └── drawable-xxhdpi/      ← 所有静态图标 PNG
+│       ├── ic_launcher_calender.png
+│       ├── ic_launcher_tencent_mm.png
+│       └── ...
+└── fancy_icons/              ← 动态图标（时钟、日历等）
+    └── ic_launcher_clock/
+        ├── manifest.xml
+        ├── manifest_1x2.xml
+        ├── manifest_2x1.xml
+        ├── manifest_2x2.xml
+        └── images/drawable-xxxhdpi/*.png
+```
+
+### 2.2 尺寸与格式
+
+- 必须是 **PNG**，带透明通道。
+- 官方要求：图标边长 **150×150 ~ 240×240 px**。
+- 实际主题素材以 `drawable-xxhdpi`（180×180）为基准，桌面会按屏幕密度缩放。
+- 同一套图标风格必须统一：尺寸、圆角、描边粗细、光源方向、图形占比一致。
+
+### 2.3 命名与包名映射
+
+- 系统应用：`ic_launcher_<英文名>.png`，例如
+  - `ic_launcher_calender.png`（日历）
+  - `ic_launcher_camera.png`（相机）
+  - `ic_launcher_clock.png`（时钟）
+  - `ic_launcher_dialer.png`（拨号）
+  - `ic_launcher_oppo_contacts.png`（联系人）
+  - `ic_launcher_settings.png`（设置）
+  - `ic_launcher_smsmms.png`（信息）
+  - `ic_launcher_filemanager.png`（文件管理）
+- 第三方应用：`launcher_<包名>.png`，例如 `launcher_com.tencent.mm.png`；也可以加 `ic_` 前缀（`ic_launcher_com.tencent.mm.png`），本地手工添加时 `ic_` 可以省略。
+- 所有文件名都要写进 `allApps.xml`：
+
+```xml
+<iconinfo>
+    <icon name="ic_launcher_calender.png" package="com.android.calendar"/>
+    <icon name="ic_launcher_calender.png" package="com.coloros.calendar"/>
+    <icon name="ic_launcher_tencent_mm.png" package="com.tencent.mm"/>
+</iconinfo>
+```
+
+- 同一个应用有多个包名（国际版、渠道版、lite 版）时，必须全部写进去。
+- 包名写错 = 图标不生效，且不会有任何报错。
+
+### 2.4 必做图标
+
+- 系统图标：编辑器开放 48 个（42 个必做、6 个选做）。
+- 第三方图标：必做 30 个，编辑器提供 327 个头部应用入口，理论上不设上限。
+- 官方必做清单包含：日历、相机、时钟、拨号、联系人、录音、指南针、文件管理、设置、信息、主题商店、QQ、微信、微博、腾讯视频、高德地图等。
+
+### 2.5 动态图标（fancy_icons）
+
+日历 / 时钟这类会随时间变化的图标，不是一张图，而是一个目录 + `manifest.xml` 脚本：
+
+```xml
+<Icon version="1" frameRate="0" width="150" height="150"
+      screenWidth="1080" useVariableUpdater="DateTime.Minute">
+    <Var name="minute_angle_raw" expression="#minute*6"/>
+    <Group>
+        <Image w="#icon_width" h="#icon_height" src="clock_day_bg.png"/>
+        <Image ... src="clock_day_minute_rectangle.png"
+               angle="#minute_angle_raw" centerX="#icon_width/2" centerY="#icon_height/2"/>
+    </Group>
+</Icon>
+```
+
+- `useVariableUpdater` 支持 `DateTime.Minute` / `DateTime.Second` / 日期变量等。
+- 需要适配 `manifest.xml`、`manifest_1x2.xml`、`manifest_2x1.xml`、`manifest_2x2.xml` 四套大图标版本。
+- 若日历/时钟改用静态图，图标上不能出现具体日期时间，否则审核不通过。
+
+### 2.6 面性 / 线性
+
+- **面性图标**：色块构成，如微信、支付宝。
+- **线性图标**：线条构成，如部分工具类应用。
+- 两种风格的安全区域不同，但共同要求是：**图标必须盖住编辑器的绿色安全框**。审核打回最常见的原因不是图标太大，而是太小。
+
+### 2.7 未适配应用的兜底：底板 / 蒙版 / 遮罩
+
+主题必须提供一组兜底素材，让未适配的三方图标也能统一风格，三者缺一不可：
+
+| 文件 | 作用 |
+|---|---|
+| `icon_background_01.png` | 底板，垫在图标下方，决定外部轮廓 |
+| `icon_mask.png` | 蒙版，盖在图标上方，决定图标形状与大小 |
+| `icon_border.png` | 遮罩，最上层，可选，用于高光/描边 |
+
+默认缩放比例为 **0.7**（0.5~0.7 可调），用于处理带大片透明边的“怪异图标”。
+
+### 2.8 大图标与异形文件夹（OS16）
+
+OS16 新增桌面大图标，需要额外提供底板，素材放在 `icons/res/drawable-xxhdpi/`：
+
+| 用途 | 文件名 | 尺寸 |
+|---|---|---|
+| 1×2 大图标底板（竖） | `morph_bg_1x2.png` | 180×615 |
+| 2×1 大图标底板（横） | `morph_bg_2x1.png` | 615×180 |
+| 2×2 大图标底板 | `morph_bg_2x2.png` | 528×528 |
+
+异形文件夹（放在 `com.android.launcher/res/drawable-xxhdpi/`）：
+
+| 用途 | 文件名 | 尺寸 |
+|---|---|---|
+| 2×1 文件夹 | `folder_two_multiply_one_bg.png` | 450×150 |
+| 1×2 文件夹 | `folder_one_multiply_two_bg.png` | 150×450 |
+
+> 注意：uxicons 目录里的大图标尺寸是 240×820 / 820×240 / 704×704，正好是上表的 4/3 倍（240/180）。两套素材比例完全一致，只是基准画布不同。
+
+---
+
+## 3. `/data/oplus/uxicons` 图标库
+
+这是本模块真正替换的目录。与主题包不同，它**不使用 allApps.xml**，而是**一个应用一个目录**。
+
+### 3.1 目录规则
+
+```
+/data/oplus/uxicons/
+├── cn.myflv.monitor.noactive/        ← 目录名 = 应用包名
+│   ├── recbg.png
+│   ├── recfg.png
+│   └── ...
+├── com.tencent.mm/
+├── com.taobao.taobao/
+└── ...
+```
+
+目录名不一定只是包名，实测有三种写法：
+
+| 写法 | 示例 | 含义 |
+|---|---|---|
+| 纯包名 | `com.tencent.mm` | 最常见，作用于整个应用 |
+| 包名 + Activity | `com.xt.retouch.uilauncher.LaunchActivity`<br>`com.baidu.netdisk.ui.OPLauncherActivity` | 只替换该 Activity 对应的桌面入口 |
+| 主题商店哈希 ID | `plus.H5925EFE7`、`plus.H5A84F959` | 主题商店生成的资源 ID，非包名 |
+| 多包名合并 | `com.xayah.databackup.foss和com.xayah.databackup.premium` | 一个图标同时适配两个包名（非标准写法，谨慎使用） |
+
+### 3.2 文件命名总表
+
+| 文件名 | 典型尺寸 | 含义 |
+|---|---|---|
+| `recbg.png` | 240×240 | **rec**tangle **b**ack**g**round（推断），1×1 图标底板层 |
+| `recfg.png` | 240×240 | **rec**tangle **f**ore**g**round（推断），1×1 图标前景层（图形，透明底） |
+| `rec_night.png` | 240×240 | 暗色模式下的前景层；部分应用只有此文件 |
+| `recbg_1x2.png` | 240×820 | 1×2 竖长大图标底板 |
+| `recfg_1x2.png` | 240×820 | 1×2 竖长大图标前景 |
+| `recbg_2x1.png` | 820×240 | 2×1 横长大图标底板 |
+| `recfg_2x1.png` | 820×240 | 2×1 横长大图标前景 |
+| `recbg_2x2.png` | 704×704 | 2×2 大图标底板 |
+| `recfg_2x2.png` | 704×704 | 2×2 大图标前景 |
+| `rec_night_1x2/2x1/2x2.png` | 同大图标 | 大图标的暗色前景版本 |
+| `monochrome.png` | 240×240 | 单色/主题图标（黑色图形 + alpha），供系统取色渲染 |
+| `monochrome_1x2/2x1/2x2.png` | 同大图标 | 大图标的单色版本 |
+| `mat.png` | 200×200 或 180×180 | **mat**erial 风格整图：只有图形、无底板（材料风格） |
+| `peb.png` | 180×180 | **peb**ble 风格整图：鹅卵石形底板 + 图形 |
+| `day.png` | 180×180 | **day**light 风格整图：彩色渐变底板 + 图形 |
+| `nsd.png` | 180×180 / 240×240 | **n**ight **s**ha**d**ow 风格整图：近黑底板 + 彩色图形 |
+| `outline.png` | 240×240 | 线性/线框风格整图：透明底 + 描边轮廓 |
+| `art_off.png` | 150×150 | 整图形态的彩色图标（推测为关闭 ART+ 时的兜底整图） |
+| `game_app.png` | 240×240 | 游戏类应用的白色低透明度外框/高光蒙版，中心透明 |
+| `dialer_recbg/recfg/...` | 180×180 | 拨号/通话入口专用的一套图层，加 `dialer_` 前缀避免与主图标冲突 |
+| `background.png` / `foreground.png` | — | 旧版 Android 自适应图标的两层（仅华为等少数应用） |
+| `launch_type_*.png` | — | 长按菜单快捷方式图标（扫一扫、收付款、离线钱包等） |
+| `share_*.png` | — | 分享面板快捷方式图标（分享到微信、朋友圈等） |
+| `shortcut_*.png` / `ic_shortcut_*.png` | — | 桌面快捷方式 / 系统快捷开关图标 |
+| `中文名.png` | — | 少数快捷方式直接以中文命名，如 `扫一扫.png`、`收付款.png` |
+| `*_temp.png` | — | 写入过程中的临时文件，**不参与渲染** |
+| `.trashed-*` | — | 被删除但未清理的残留文件，**不参与渲染** |
+
+### 3.3 `cn.myflv.monitor.noactive` 逐文件说明
+
+这个目录是最小完整示例，9 个文件覆盖了 1×1 与三种大图标：
+
+| 文件 | 尺寸 | 内容（实测） |
+|---|---|---|
+| `rec_night.png` | 240×240 | 白色前景图形，透明底，不透明像素约占 19% |
+| `recbg.png` | 240×240 | 纯色 `#3DDC84` 绿色底板，不透明、铺满画布 |
+| `recbg_1x2.png` | 240×820 | 绿色底板拉长为竖长条 |
+| `recbg_2x1.png` | 820×240 | 绿色底板拉长为横长条 |
+| `recbg_2x2.png` | 704×704 | 绿色底板放大为 2×2 方块 |
+| `recfg.png` | 240×240 | 白色图形前景，图形包围盒约 `(50,43)-(190,197)` |
+| `recfg_1x2.png` | 240×820 | 图形垂直居中于 820 高画布，包围盒 `(50,333)-(190,487)` |
+| `recfg_2x1.png` | 820×240 | 图形水平居中 |
+| `recfg_2x2.png` | 704×704 | 图形居中放大，包围盒 `(131,106)-(573,598)` |
+
+要点：
+
+- `recbg` 是**不透明**的底板，不需要画圆角——圆角/形状由桌面按当前图标风格裁切。
+- `recfg` 是**透明底 + 图形**，图形默认偏白色，保证叠在深色底板上可读。
+- 大图标的三组 `_1x2/_2x1/_2x2` 不是把 1×1 图简单拉伸：底板铺满整块区域，前景图形保持原始比例并居中，只是画布变大。
+- 1×2 = 占 1 列 2 行（竖），2×1 = 占 2 列 1 行（横）。
+
+### 3.4 尺寸对照
+
+| 形态 | uxicons 尺寸 | 主题模块 xxhdpi 尺寸 |
+|---|---|---|
+| 1×1 | 240×240 | 180×180 |
+| 1×2 | 240×820 | 180×615 |
+| 2×1 | 820×240 | 615×180 |
+| 2×2 | 704×704 | 528×528 |
+
+目录里还能看到 288、256、254、200、196、180、168、162、150、108 等尺寸，这是不同 OS 版本、不同机型、不同年代素材混放的结果，并不是规范。**新素材统一按上表制作**。
+
+### 3.5 颜色与透明度
+
+- `recbg*`：不透明底板（RGB 或调色板 PNG，整张画布无透明像素）。
+- `recfg*`、`rec_night*`、`monochrome*`：透明底，只有图形区域有 alpha。
+- `monochrome*`：图形为纯黑 `#000000`，透明度承载形状，系统会按主题色/壁纸取色重新着色。
+- 暗色模式不是简单把前景反色：`rec_night` 可以是白色图形，也可以保留品牌色（例如微信的暗色前景仍是绿色图形）。
+
+### 3.6 缺失时的回退关系（实测推断）
+
+按目录内容的分布推导，建议按以下顺序取值：
+
+1. 2×2 大图标：底板 `recbg_2x2` + 前景 `recfg_2x2`；任一缺失时回退到 1×1 的 `recbg`/`recfg`，由桌面放大。
+2. 1×2 / 2×1 大图标：同理使用 `recbg_1x2`/`recfg_1x2`、`recbg_2x1`/`recfg_2x1`。
+3. 暗色前景：`rec_night_2x2/2x1/1x2` → `rec_night` → `recfg_*`/`recfg`。
+4. 单色图标：`monochrome_*` → `monochrome` → 系统自行去色。
+5. 风格整图：当前风格对应的 `mat/peb/day/nsd/outline` → 分层图标 `recbg + recfg`。
+6. 底板缺失时，桌面用图标主色自动生成底板。
+
+> 有 160 个应用只有 `rec_night.png` 一个文件（透明底、灰色/白色图形），说明桌面允许“只有前景层”的图标，底板由系统补全。
+
+### 3.7 目录中的特殊/脏数据
+
+这些不是规范的一部分，但真实存在，处理工具时要跳过或容错：
+
+- `temp_u0/`：整个临时下载目录，里面是 `*_temp.png`。
+- `com.ss.android.ugc.aweme.lite.bak`：空目录/备份目录。
+- `.trashed-123-rec_night.png`：Android 回收站命名的残留文件。
+- `.*.swp`、`*.jpg`、`*.xml`：非图标杂项。
+- 7 个 `icons-*` 文件（`icons-rectangle`、`icons-pebble`、`icons-daylight`、`icons-nightshadow`、`icons-meterial`、`icons-monorectangle`、`icons-darkrectangle`）：它们其实是 **ZIP**（PK 头），是各图标风格的资源包，不是 PNG。
+
+### 3.8 图标风格与 `icons-*` 资源包
+
+7 个风格包对应 ColorOS 的图标风格选项：
+
+| 文件 | 风格 | 说明 |
+|---|---|---|
+| `icons-rectangle` | 矩形 | 默认圆角矩形 |
+| `icons-darkrectangle` | 暗色矩形 | 深色底板的矩形 |
+| `icons-monorectangle` | 单色矩形 | 单色（monocolour）矩形 |
+| `icons-pebble` | 鹅卵石 | ColorOS 7 起的标志性圆润形状 |
+| `icons-material`（`icons-meterial`，官方拼写如此） | 材料 | Google Material Design 风格 |
+| `icons-daylight` | 日光 | 明亮渐变风格 |
+| `icons-nightshadow` | 暗影 | 近黑底板 + 彩色图形 |
+
+每个包里是 `resources.arsc` + `fancy_icons/<图标名>/manifest*.xml` + `images/drawable-xxxhdpi/*.png`，只覆盖时钟、日历等动态图标（约 6~27 个文件），不是全量图标集。
+
+### 3.9 主题目录里的其它配置
+
+`my_product/media/theme/` 下除 `uxicons/` 外还有 4 个配置文件：
+
+| 文件 | 内容 | 作用 |
+|---|---|---|
+| `allApps.xml` | 3118 条 `<icon name=... package=.../>` | 主题图标模块的包名映射表 |
+| `drawableMapping.xml` | 2820 条 `<item package=.../>`（只有包名） | 推测为桌面建立图标索引/白名单 |
+| `icon_version.xml` | `<uxicon><version>5</version></uxicon>` | uxicons 资源版本号，修改素材格式时需留意 |
+| `.nomedia` | 空标记文件 | 阻止媒体扫描相册 |
+
+另有 6 个以包名命名的无扩展名文件（`com.taobao.taobao`、`com.jingdong.app.mall` 等）：它们是编译后的资源包（含 `resources.arsc`、`res/`、`adaptive-icon` 的 `background`/`foreground`），不是 PNG，也不是目录。
+
+---
+
+## 4. 制作与校验清单
+
+### 4.1 新增一个应用图标
+
+1. 确认包名：`adb shell pm list packages | grep 关键词`，或查看桌面入口的 Activity。
+2. 建目录：`my_product/media/theme/uxicons/hdpi/<包名>/`。
+3. 放入 9 个文件：`recbg`、`recfg`、`rec_night` + 各自的 `_1x2/_2x1/_2x2`。
+4. 有单色需求再加 `monochrome` 及三种大图标版本。
+5. 权限统一 0777（安装脚本已处理）。
+6. 重装模块 → 重启桌面（或重启设备）验证。
+
+### 4.2 自检项
+
+- [ ] 所有 PNG 是真实 PNG（`file` 检查），不是改扩展名。
+- [ ] `recbg` 整张画布不透明，没有有效透明像素。
+- [ ] `recfg` 四角完全透明，图形居中，未贴边。
+- [ ] 图形在 `_2x2` 中保持 1×1 比例，没有被拉伸变形。
+- [ ] 暗色前景 `rec_night` 在近黑底板上可辨认。
+- [ ] `monochrome` 为纯黑图形 + alpha，没有彩色像素。
+- [ ] 文件名全小写，`1x2` 用字母 `x` 而不是 `×`。
+- [ ] 目录名与包名完全一致（区分大小写）。
+- [ ] 没有把 `*_temp.png`、`.trashed-*` 打进包。
+
+### 4.3 本模块的安装路径
+
+| 阶段 | 行为 |
+|---|---|
+| 安装 | `customize.sh` 把 `hdpi/*` 复制到 `/data/oplus/uxicons/`；`post-fs-data.sh` 把 `my_product/media/theme` 绑定挂载到 `/my_product/media/theme` |
+| 卸载 | `uninstall.sh` 清空 `/data/oplus/uxicons/*`，再把 `uxicons.zip` 解压回去 |
+
+> 注意两处路径差异：仓库里是 `.../uxicons/hdpi/<包名>/`，安装后是 `/data/oplus/uxicons/<包名>/`（少一层 `hdpi`）；而 `uxicons.zip` 内部自带一层 `uxicons/`，解压后会生成 `/data/oplus/uxicons/uxicons/<包名>/`。制作替换包时需确认桌面实际读取的是哪一层。
+
+---
+
+## 5. 参考资料
+
+- [ColorOS16 主题包适配指导规范（OPPO 开放平台）](https://open.oppomobile.com/documentation/page/info?id=13718)
+- [编辑器 APP 图标适配教程（OPPO 开放平台）](https://open.oppomobile.com/documentation/page/info?id=12057)
+- [主题制作常见问题（OPPO 开放平台）](https://open.oppomobile.com/documentation/page/info?id=11929)
+- [主题教程：解包添加第三方图标和配置方法](https://open.oppomobile.com/bbs/forum.php?mod=viewthread&tid=2690)
+- [桌面图标风格的设置方法（OPPO 支持）](https://support.oppo.com/cn/self-service/#/articleDetail/?aid=SI2107127)
+- [ColorOS 11 图标自定义介绍](https://www.coloros.com/instruction?id=654&version=ColorOS%2011)
