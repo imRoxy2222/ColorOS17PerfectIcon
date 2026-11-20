@@ -3,6 +3,14 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// versionCode 取 master 分支的 commit 数，取不到时回退为 1
+fun gitCommitCount(): Int = runCatching {
+    providers.exec {
+        commandLine("git", "rev-list", "--count", "master")
+        workingDir = rootDir
+    }.standardOutput.asText.get().trim().toInt()
+}.getOrDefault(1)
+
 android {
     namespace = "io.github.imroxy2222.coloros17perfecticon"
     compileSdk = 36
@@ -11,7 +19,7 @@ android {
         applicationId = "io.github.imroxy2222.ColorOS17PerfectIcon"
         minSdk = 34
         targetSdk = 36
-        versionCode = 1
+        versionCode = gitCommitCount()
         versionName = "1.0"
     }
 
