@@ -766,7 +766,7 @@ private fun BottomPanel(
                                 contentColor = MiuixTheme.colorScheme.onPrimary,
                             ),
                         ) {
-                            Text("分享&保存")
+                            Text("分享")
                         }
                     } else {
                         Row(
