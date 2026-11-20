@@ -61,8 +61,14 @@ APK 由 Actions 构建并签名，密钥保存在仓库 Secrets 中。本机已�
 
    | 产物 | 说明 |
    | --- | --- |
-   | `ColorOS17PerfectIcon-<版本>-<versionCode>.apk` | 已用 `coloros17` 密钥签名的 release APK |
-   | `ColorOSart-<版本>.zip` | 可直接刷入的 Magisk 模块 |
+   | `完美图标.apk` | 已用 `coloros17` 密钥签名的 release APK |
+   | `完美图标模块_<commit数>_适配<数量>.zip` | 可直接刷入的 Magisk 模块 |
+
+   文件名规则：
+   - `commit数`：`git rev-list --count HEAD`，与 APP 的 `versionCode` 同源，随提交数递增；
+   - `数量`：`my_product/media/theme/uxicons/hdpi/` 下实际覆盖的包名数。统计时会自动
+     跳过 `temp_*`、`plus.*`、`icons-*`、`.trashed*`、`*.bak`、无点号的杂项目录，
+     把“包名.Activity”目录归并到包名，`A和B` 这种目录按 2 个应用计数。
 
    没有打 tag 时（手动 `Run workflow`）只上传 Actions Artifacts，不会创建 Release。
 
@@ -74,8 +80,9 @@ APK 由 Actions 构建并签名，密钥保存在仓库 Secrets 中。本机已�
 2. 安装 JDK 17、Android SDK（`platforms;android-36`、`build-tools;36.0.0`）。
 3. 把 `C17_KEYSTORE_B64` 解码到 `$RUNNER_TEMP/c17-release.jks`。
 4. `./gradlew :app:assembleRelease`，签名配置读取环境变量（见 `code/app/build.gradle.kts` 的 `signingConfigs`）。
-5. `apksigner verify` 校验签名，并把 APK 重命名为带版本号和 versionCode 的名字。
-6. `python3 build.py` 打包模块 zip（自动排除 `code/`、`doc/`、`dist/`、`.github/`）。
+5. `apksigner verify` 校验签名，并把 APK 重命名为 `完美图标.apk`。
+6. 统计 `my_product/media/theme/uxicons/hdpi/` 覆盖的包名数，用 `python3 build.py`
+   打包模块 zip（自动排除 `code/`、`doc/`、`dist/`、`.github/`）。
 7. 用 `softprops/action-gh-release` 创建 Release 并附加两个文件。
 
 ---

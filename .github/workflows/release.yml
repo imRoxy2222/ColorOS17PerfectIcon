@@ -55,22 +55,52 @@ jobs:
         working-directory: code
         run: ./gradlew --no-daemon :app:assembleRelease
 
+      - name: 统计适配应用数量
+        id: adapted
+        run: |
+          COUNT=$(python3 - <<'PY'
+          import os
+
+          root = "my_product/media/theme/uxicons/hdpi"
+          skip = (".", "temp_", "plus.", "icons-")
+          names = []
+          for name in os.listdir(root):
+              if not os.path.isdir(os.path.join(root, name)):
+                  continue
+              if name.startswith(skip) or name.endswith(".bak") or "." not in name:
+                  continue
+              # com.yipiao#com.app.main.entrance.MainActivity 这类写法只取包名
+              names.append(name.split("#")[0])
+
+          name_set = set(names)
+          apps = set()
+          for name in names:
+              if "和" in name:
+                  apps.update(name.split("和"))
+                  continue
+              # “包名.Activity” 目录归并到包名
+              parts = name.split(".")
+              if any(".".join(parts[:i]) in name_set for i in range(1, len(parts))):
+                  continue
+              apps.add(name)
+          print(len(apps))
+          PY
+          )
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+
       - name: 校验并重命名 APK
         id: apk
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          CODE=$(git rev-list --count HEAD)
           APK="code/app/build/outputs/apk/release/app-release.apk"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK"
-          OUT="ColorOS17PerfectIcon-${VERSION}-${CODE}.apk"
-          cp "$APK" "$OUT"
-          echo "name=$OUT" >> "$GITHUB_OUTPUT"
+          cp "$APK" "完美图标.apk"
+          echo "name=完美图标.apk" >> "$GITHUB_OUTPUT"
 
       - name: 打包 Magisk 模块
         id: module
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          OUT="ColorOSart-${VERSION}.zip"
+          CODE=$(git rev-list --count HEAD)
+          OUT="完美图标模块_${CODE}_适配${{ steps.adapted.outputs.count }}.zip"
           python3 build.py -q -o "$OUT"
           echo "name=$OUT" >> "$GITHUB_OUTPUT"
 
