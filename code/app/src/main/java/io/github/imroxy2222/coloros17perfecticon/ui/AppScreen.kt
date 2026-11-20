@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -71,12 +72,10 @@ import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.state.ToggleableState
@@ -84,6 +83,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.pm.PackageInfoCompat
 import io.github.imroxy2222.coloros17perfecticon.R
 import io.github.imroxy2222.coloros17perfecticon.export.Exporter
 import io.github.imroxy2222.coloros17perfecticon.icon.AppItem
@@ -95,6 +95,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -903,6 +906,10 @@ private fun BottomPanel(
 
 @Composable
 private fun BottomTabBar(selected: Int, onSelect: (Int) -> Unit) {
+    val tabs = listOf(
+        "功能" to R.drawable.ic_tab_function,
+        "关于" to R.drawable.ic_tab_about,
+    )
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -913,25 +920,50 @@ private fun BottomTabBar(selected: Int, onSelect: (Int) -> Unit) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp),
+                .height(62.dp)
+                .padding(horizontal = 24.dp),
         ) {
-            listOf("功能", "关于").forEachIndexed { index, label ->
-                Box(
+            tabs.forEachIndexed { index, (label, icon) ->
+                val active = selected == index
+                val color = if (active) {
+                    MiuixTheme.colorScheme.primary
+                } else {
+                    MiuixTheme.colorScheme.onSurfaceVariantSummary
+                }
+                Column(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
                         .clickable { onSelect(index) },
-                    contentAlignment = Alignment.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
                 ) {
+                    Box(
+                        modifier = Modifier
+                            .size(width = 48.dp, height = 28.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(
+                                if (active) {
+                                    MiuixTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                } else {
+                                    Color.Transparent
+                                },
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            painter = painterResource(icon),
+                            contentDescription = label,
+                            modifier = Modifier.size(20.dp),
+                            tint = color,
+                        )
+                    }
+                    Spacer(Modifier.height(2.dp))
                     Text(
                         text = label,
-                        fontSize = 14.sp,
-                        fontWeight = if (selected == index) FontWeight.Medium else FontWeight.Normal,
-                        color = if (selected == index) {
-                            MiuixTheme.colorScheme.primary
-                        } else {
-                            MiuixTheme.colorScheme.onSurfaceVariantSummary
-                        },
+                        fontSize = 11.sp,
+                        fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
+                        color = color,
                     )
                 }
             }
@@ -942,11 +974,13 @@ private fun BottomTabBar(selected: Int, onSelect: (Int) -> Unit) {
 @Composable
 private fun AboutPage(modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val version = remember {
+    val info = remember {
         runCatching {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        }.getOrNull().orEmpty()
+            context.packageManager.getPackageInfo(context.packageName, 0)
+        }.getOrNull()
     }
+    val version = info?.versionName.orEmpty()
+    val versionCode = info?.let { PackageInfoCompat.getLongVersionCode(it).toString() }.orEmpty()
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -954,7 +988,7 @@ private fun AboutPage(modifier: Modifier = Modifier) {
             .padding(top = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        FlowingIconBox(version)
+        FlowingIconBox(version = version, versionCode = versionCode)
         Spacer(Modifier.height(24.dp))
         Card(
             modifier = Modifier
@@ -979,38 +1013,63 @@ private fun AboutPage(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun FlowingIconBox(version: String) {
-    val screenWidth = LocalConfiguration.current.screenWidthDp
-    val boxSize = (screenWidth * 0.85f).dp
+private fun FlowingIconBox(version: String, versionCode: String) {
     val transition = rememberInfiniteTransition(label = "flow")
-    val angle by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 6000, easing = LinearEasing),
-        ),
-        label = "angle",
+    fun spec(duration: Int) = infiniteRepeatable<Float>(
+        animation = tween(durationMillis = duration, easing = LinearEasing),
     )
+    val t1 by transition.animateFloat(0f, 1f, spec(15000), label = "t1")
+    val t2 by transition.animateFloat(0f, 1f, spec(21000), label = "t2")
+    val t3 by transition.animateFloat(0f, 1f, spec(18000), label = "t3")
+    val t4 by transition.animateFloat(0f, 1f, spec(26000), label = "t4")
+
     Box(
         modifier = Modifier
-            .size(boxSize)
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .aspectRatio(1f)
             .clip(RoundedCornerShape(28.dp))
-            .background(Color(0xFF111317)),
+            .background(Color(0xFF0E1014)),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(Modifier.fillMaxSize()) {
-            rotate(angle) {
-                drawRect(
-                    brush = Brush.sweepGradient(
-                        0f to Color.Transparent,
-                        0.12f to Color.White.copy(alpha = 0.35f),
-                        0.30f to Color.Transparent,
-                        0.62f to Color(0x33A8CCFF),
-                        0.80f to Color.Transparent,
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    renderEffect = BlurEffect(60f, 60f, TileMode.Clamp)
+                },
+        ) {
+            fun wisp(
+                t: Float,
+                cx: Float,
+                cy: Float,
+                dx: Float,
+                dy: Float,
+                radius: Float,
+                color: Color,
+            ) {
+                val angle = (2.0 * PI * t).toFloat()
+                val center = Offset(
+                    (cx + dx * sin(angle)) * size.width,
+                    (cy + dy * cos(angle)) * size.height,
+                )
+                val r = radius * size.width * (1f + 0.18f * sin(angle + 1f))
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        0f to color,
+                        0.55f to color.copy(alpha = color.alpha * 0.45f),
                         1f to Color.Transparent,
+                        center = center,
+                        radius = r,
                     ),
+                    radius = r,
+                    center = center,
                 )
             }
+            wisp(t1, 0.30f, 0.36f, 0.12f, 0.10f, 0.58f, Color.White.copy(alpha = 0.18f))
+            wisp(t2, 0.74f, 0.28f, 0.08f, 0.12f, 0.50f, Color(0xFF8FB4FF).copy(alpha = 0.22f))
+            wisp(t3, 0.56f, 0.74f, 0.13f, 0.08f, 0.62f, Color(0xFFB58CFF).copy(alpha = 0.18f))
+            wisp(t4, 0.22f, 0.80f, 0.10f, 0.09f, 0.46f, Color(0xFF7FE3FF).copy(alpha = 0.16f))
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
@@ -1019,11 +1078,17 @@ private fun FlowingIconBox(version: String) {
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(8.dp))
             Text(
                 "版本 ${version.ifEmpty { "1.0" }}",
                 fontSize = 12.sp,
-                color = Color.White.copy(alpha = 0.6f),
+                color = Color.White.copy(alpha = 0.65f),
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                "versionCode ${versionCode.ifEmpty { "1" }}",
+                fontSize = 11.sp,
+                color = Color.White.copy(alpha = 0.45f),
             )
         }
     }
