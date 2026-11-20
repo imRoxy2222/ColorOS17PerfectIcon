@@ -1,7 +1,11 @@
 package io.github.imroxy2222.coloros17perfecticon.ui
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -249,6 +253,7 @@ fun AppScreen() {
                     append("已导出 ${result.exported} 个应用")
                     if (result.skipped > 0) append("，跳过 ${result.skipped} 个已适配应用")
                 }
+                showLongToast(context, "已保存到 Download/${result.name}")
             } catch (e: CancellationException) {
                 state.message = "已取消导出"
             } catch (e: Exception) {
@@ -451,6 +456,13 @@ fun AppScreen() {
             OptionsDrawer(state = state, onClose = { drawerOpen = false })
         }
     }
+}
+
+/** Toast.LENGTH_LONG 约 3.5s，再续一次凑满 5s。 */
+private fun showLongToast(context: Context, text: String) {
+    val toast = Toast.makeText(context, text, Toast.LENGTH_LONG)
+    toast.show()
+    Handler(Looper.getMainLooper()).postDelayed({ toast.show() }, 2200L)
 }
 
 @Composable

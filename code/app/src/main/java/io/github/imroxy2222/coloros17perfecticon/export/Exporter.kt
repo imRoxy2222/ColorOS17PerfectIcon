@@ -17,6 +17,9 @@ import org.json.JSONObject
 import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.zip.CRC32
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -39,7 +42,7 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
         val rootRaw: Boolean = false,
     )
 
-    class Result(val uri: Uri, val exported: Int, val skipped: Int)
+    class Result(val uri: Uri, val exported: Int, val skipped: Int, val name: String)
 
     suspend fun export(
         apps: List<AppItem>,
@@ -58,7 +61,7 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
         val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-            ?: throw IOException("无法在 Download 目录创建 icon.zip")
+            ?: throw IOException("无法在 Download 目录创建导出文件")
 
         try {
             val index = JSONArray()
@@ -83,21 +86,28 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
                     }
                     writeBytes(zip, "index.json", root.toString(2).toByteArray(Charsets.UTF_8), store = false)
                 }
-            } ?: throw IOException("无法写入 icon.zip")
+            } ?: throw IOException("无法写入导出文件")
 
+            val name = "ColorOS17完美图标_${stamp()}_app_$exported.zip"
             resolver.update(
                 uri,
-                ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) },
+                ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+                    put(MediaStore.MediaColumns.IS_PENDING, 0)
+                },
                 null,
                 null,
             )
-            Result(uri, exported, skipped)
+            Result(uri, exported, skipped, name)
         } catch (t: Throwable) {
             resolver.delete(uri, null, null)
             if (t is CancellationException) throw t
             throw t
         }
     }
+
+    private fun stamp(): String =
+        SimpleDateFormat("yyyyMMddHHmmss", Locale.US).format(Date())
 
     private fun writeApp(
         zip: ZipOutputStream,
