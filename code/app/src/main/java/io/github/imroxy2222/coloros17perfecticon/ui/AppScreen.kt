@@ -21,6 +21,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -145,6 +146,7 @@ class UiState {
     var exportTotal by mutableStateOf(0)
     var exportLabel by mutableStateOf("")
     var resultUri by mutableStateOf<Uri?>(null)
+    var resultName by mutableStateOf<String?>(null)
     var message by mutableStateOf<String?>(null)
 
     var scanJob: Job? = null
@@ -268,6 +270,7 @@ fun AppScreen() {
                     state.exportLabel = label
                 }
                 state.resultUri = result.uri
+                state.resultName = result.name
                 state.message = buildString {
                     append("已导出 ${result.exported} 个应用")
                     if (result.skipped > 0) append("，跳过 ${result.skipped} 个已适配应用")
@@ -295,11 +298,12 @@ fun AppScreen() {
     LaunchedEffect(Unit) { startScan() }
 
     val adaptedCount = snapshot.count { it.adapted }
-    val summary = if (state.scanning) {
+    val summaryTitle = if (state.scanning) {
         "正在扫描 ${state.scanned} / ${state.total}"
     } else {
-        "共 ${snapshot.size} 个应用 · 未适配 ${snapshot.size - adaptedCount} · 已适配 $adaptedCount"
+        "共 ${snapshot.size} 个应用"
     }
+    val summaryDetail = "未适配 ${snapshot.size - adaptedCount} · 已适配 $adaptedCount"
     val selectedCount = state.selected.count { it.value }
     val exportCount = if (selectedCount > 0) selectedCount else filtered.size
     val pageLayer = rememberGraphicsLayer()
@@ -372,7 +376,8 @@ fun AppScreen() {
                     if (page == 0) {
                         BottomPanel(
                             state = state,
-                            summary = summary,
+                            title = summaryTitle,
+                            detail = summaryDetail,
                             exportCount = exportCount,
                             allFilteredSelected = allFilteredSelected,
                             onSelectAll = { toggleSelectAll() },
@@ -381,6 +386,7 @@ fun AppScreen() {
                             onShare = { state.resultUri?.let { share(it) } },
                             onResetExport = {
                                 state.resultUri = null
+                                state.resultName = null
                                 state.message = null
                             },
                         )
@@ -785,7 +791,8 @@ private fun StatusTag(adapted: Boolean) {
 @Composable
 private fun BottomPanel(
     state: UiState,
-    summary: String,
+    title: String,
+    detail: String,
     exportCount: Int,
     allFilteredSelected: Boolean,
     onSelectAll: () -> Unit,
@@ -798,18 +805,30 @@ private fun BottomPanel(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
-            .padding(top = 6.dp),
+            .padding(top = 6.dp, bottom = 8.dp),
     ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            insideMargin = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .shadow(14.dp, RoundedCornerShape(26.dp))
+                .clip(RoundedCornerShape(26.dp))
+                .background(MiuixTheme.colorScheme.surfaceContainerHighest)
+                .border(
+                    width = 1.dp,
+                    color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.06f),
+                    shape = RoundedCornerShape(26.dp),
+                )
+                .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
             when {
                 state.scanning -> {
+                    Text(title, style = MiuixTheme.textStyles.body2, maxLines = 1)
+                    Spacer(Modifier.height(2.dp))
                     Text(
-                        summary,
+                        detail,
                         style = MiuixTheme.textStyles.footnote1,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        maxLines = 1,
                     )
                     LinearProgressIndicator(
                         progress = if (state.total > 0) state.scanned.toFloat() / state.total else 0f,
@@ -818,11 +837,23 @@ private fun BottomPanel(
                 }
 
                 state.exporting -> {
-                    Text(
-                        state.exportLabel.ifEmpty { "准备中…" },
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                state.exportLabel.ifEmpty { "准备中…" },
+                                style = MiuixTheme.textStyles.body2,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                "${state.exportDone} / ${state.exportTotal}",
+                                style = MiuixTheme.textStyles.footnote1,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            )
+                        }
+                        TextButton("取消", onClick = onCancelExport)
+                    }
                     LinearProgressIndicator(
                         progress = if (state.exportTotal > 0) {
                             state.exportDone.toFloat() / state.exportTotal
@@ -831,76 +862,77 @@ private fun BottomPanel(
                         },
                         modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            "${state.exportDone} / ${state.exportTotal}",
-                            style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        )
-                        Spacer(Modifier.weight(1f))
-                        TextButton("取消", onClick = onCancelExport)
+                }
+
+                state.resultUri != null -> {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                state.message ?: "导出完成",
+                                style = MiuixTheme.textStyles.body2,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                state.resultName ?: detail,
+                                style = MiuixTheme.textStyles.footnote1,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        TextButton("继续导出", onClick = onResetExport)
+                        Spacer(Modifier.width(4.dp))
+                        Button(
+                            onClick = onShare,
+                            colors = ButtonDefaults.buttonColors(
+                                color = MiuixTheme.colorScheme.primary,
+                                contentColor = MiuixTheme.colorScheme.onPrimary,
+                            ),
+                        ) {
+                            Text("分享")
+                        }
                     }
                 }
 
                 else -> {
-                    Text(
-                        summary,
-                        style = MiuixTheme.textStyles.footnote1,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    )
-                    state.message?.let {
-                        Spacer(Modifier.height(4.dp))
-                        Text(it, style = MiuixTheme.textStyles.footnote1)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(title, style = MiuixTheme.textStyles.body2, maxLines = 1)
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                detail,
+                                style = MiuixTheme.textStyles.footnote1,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                maxLines = 1,
+                            )
+                        }
+                        TextButton(
+                            text = if (allFilteredSelected) "取消全选" else "全选",
+                            onClick = onSelectAll,
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Button(
+                            onClick = onExport,
+                            enabled = exportCount > 0,
+                            colors = ButtonDefaults.buttonColors(
+                                color = MiuixTheme.colorScheme.primary,
+                                contentColor = MiuixTheme.colorScheme.onPrimary,
+                            ),
+                        ) {
+                            Text("导出")
+                        }
                     }
-                    if (state.resultUri != null) {
-                        Spacer(Modifier.height(10.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            TextButton(
-                                text = "继续导出",
-                                onClick = onResetExport,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Button(
-                                onClick = onShare,
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(
-                                    color = MiuixTheme.colorScheme.primary,
-                                    contentColor = MiuixTheme.colorScheme.onPrimary,
-                                ),
-                            ) {
-                                Text("分享")
-                            }
-                        }
-                    } else {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            TextButton(
-                                text = if (allFilteredSelected) "取消全选" else "全选",
-                                onClick = onSelectAll,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Button(
-                                onClick = onExport,
-                                enabled = exportCount > 0,
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(
-                                    color = MiuixTheme.colorScheme.primary,
-                                    contentColor = MiuixTheme.colorScheme.onPrimary,
-                                ),
-                            ) {
-                                Text("导出")
-                            }
-                        }
+                    state.message?.let {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            it,
+                            style = MiuixTheme.textStyles.footnote1,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
             }
