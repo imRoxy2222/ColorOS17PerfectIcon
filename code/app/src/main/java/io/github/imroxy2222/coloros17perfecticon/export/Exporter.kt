@@ -31,9 +31,9 @@ import java.util.zip.ZipOutputStream
  * 结构：
  * icon.zip
  * ├── index.json
- * ├── 未适配/<包名>/icon.png [bg.png fg.png mono.png] [raw/...]
- * ├── 自适配/<包名>/icon.png icon2.png [bg.png fg.png mono.png]
- * └── 已适配/<包名>/icon.png icon2.png [bg.png fg.png mono.png]
+ * ├── 未适配/<包名>/appinfo.txt icon.png [bg.png fg.png mono.png] [raw/...]
+ * ├── 自适配/<包名>/appinfo.txt icon.png icon2.png [bg.png fg.png mono.png]
+ * └── 已适配/<包名>/appinfo.txt icon.png icon2.png [bg.png fg.png mono.png]
  */
 class Exporter(private val context: Context, private val extractor: IconExtractor) {
 
@@ -135,6 +135,17 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
             AdaptState.NONE -> "未适配/"
         } + app.pkg
         val files = mutableListOf<String>()
+
+        val versionName = runCatching {
+            context.packageManager.getPackageInfo(app.pkg, 0).versionName
+        }.getOrNull() ?: "-"
+        val info = buildString {
+            append("应用名称：").append(app.label).append('\n')
+            append("应用版本：").append(versionName).append('\n')
+            append("应用包名：").append(app.pkg).append('\n')
+        }
+        writeBytes(zip, "$dir/appinfo.txt", info.toByteArray(Charsets.UTF_8), store = false)
+        files += "appinfo.txt"
 
         val dayIcon = extractor.loadIcon(app.pkg, app.iconRes, night = false)
         if (dayIcon != null) {
@@ -241,6 +252,7 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
             |├── README.md              本说明
             |├── index.json             清单：包名、名称、是否已适配、包含的文件
             |├── 未适配/<包名>/
+            |│   ├── appinfo.txt        应用名称、版本、包名
             |│   ├── icon.png           整图，桌面实际显示效果（参考用）
             |│   ├── bg.png             背景层（底板）
             |│   ├── fg.png             前景层（图形，透明底）
