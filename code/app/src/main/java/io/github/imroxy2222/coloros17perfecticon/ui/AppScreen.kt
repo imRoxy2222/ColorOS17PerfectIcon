@@ -713,35 +713,40 @@ private fun BottomPanel(
                         Spacer(Modifier.height(4.dp))
                         Text(it, style = MiuixTheme.textStyles.footnote1)
                     }
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        TextButton(
-                            text = if (allFilteredSelected) "取消全选" else "全选",
-                            onClick = onSelectAll,
-                            modifier = Modifier.weight(1f),
-                        )
+                    if (state.resultUri != null) {
+                        Spacer(Modifier.height(10.dp))
                         Button(
-                            onClick = onExport,
-                            enabled = exportCount > 0,
-                            modifier = Modifier.weight(1f),
+                            onClick = onShare,
+                            modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(
                                 color = MiuixTheme.colorScheme.primary,
                                 contentColor = MiuixTheme.colorScheme.onPrimary,
                             ),
                         ) {
-                            Text("导出")
+                            Text("分享&保存")
                         }
-                    }
-                    if (state.resultUri != null) {
-                        Box(Modifier.fillMaxWidth()) {
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             TextButton(
-                                "分享",
-                                onClick = onShare,
-                                modifier = Modifier.align(Alignment.CenterEnd),
+                                text = if (allFilteredSelected) "取消全选" else "全选",
+                                onClick = onSelectAll,
+                                modifier = Modifier.weight(1f),
                             )
+                            Button(
+                                onClick = onExport,
+                                enabled = exportCount > 0,
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(
+                                    color = MiuixTheme.colorScheme.primary,
+                                    contentColor = MiuixTheme.colorScheme.onPrimary,
+                                ),
+                            ) {
+                                Text("导出")
+                            }
                         }
                     }
                 }
