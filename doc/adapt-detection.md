@@ -54,12 +54,14 @@
 | `plus.H5925EFE7` | 主题商店哈希 ID，无法映射，跳过 |
 | `temp_*` / `.*` / `*.bak` | 临时、隐藏、备份目录，跳过 |
 
-「已适配」还需要满足：
+「已适配」还需要满足（满足其一即可）：
 
-- 目录里存在 `rec_night.png`；
-- 存在 `recfg.png` 时，两个文件**字节不相同**（`contentEquals`）。
+- 目录里存在 `rec_night.png`，且有 `recfg.png` 时两个文件**字节不相同**（`contentEquals`）；
+- 目录里存在 `nsd.png`（暗影整图：近黑底板 + 彩色图形），且有 `recfg.png` 时两者内容不同。
 
-只把 `recfg.png` 复制一份改名成 `rec_night.png` 的素材，夜间仍是白天那张图，判定为未适配。
+只把 `recfg.png` 复制一份改名成 `rec_night.png`、又没有 `nsd.png` 的素材，夜间仍是
+白天那张图，判定为未适配（例如贴吧 Lite）；而滴滴出行这类 `rec_night` 是副本、
+但带 `nsd.png` 的应用，会按暗色素材判定为已适配。
 
 ## 3. APK 夜间图标比对（自适配）
 

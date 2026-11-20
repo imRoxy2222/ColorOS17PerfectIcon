@@ -202,9 +202,10 @@ class IconExtractor(context: Context) {
  * - 模块素材：`/my_product/media/theme/uxicons/<density>/<包名>/`
  * - 安装后生效：`/data/oplus/uxicons/<包名>/`
  *
- * 一个应用“已适配”的判据是：目录存在，并且含有与日间前景（recfg.png）不同的
- * 暗色前景 rec_night.png。只有目录存在但暗夜前景与日间完全相同（很多应用是直接
- * 复制的）时，夜间仍然显示原图，视为未适配。
+ * 一个应用“已适配”的判据是：目录存在，并且含有可用的暗色素材——
+ * 与日间前景（recfg.png）不同的 `rec_night.png`，或 `nsd.png`（暗影整图：
+ * 近黑底板 + 彩色图形）。若夜间素材只是日间图的副本（很多应用直接复制），
+ * 夜间仍显示原图，视为未适配。
  */
 class ThemeIconPack private constructor(
     private val dirs: Map<String, List<File>>,
@@ -238,11 +239,19 @@ class ThemeIconPack private constructor(
     }
 
     private fun computeNight(dir: File): Boolean {
-        val night = File(dir, "rec_night.png")
-        if (!night.isFile) return false
         val day = File(dir, "recfg.png")
+        val night = File(dir, "rec_night.png")
+        if (night.isFile) {
+            if (!day.isFile) return true
+            if (runCatching { !night.readBytes().contentEquals(day.readBytes()) }.getOrDefault(false)) {
+                return true
+            }
+        }
+        // rec_night 缺失或是日间图的副本时，再看 nsd.png（近黑底板 + 彩色图形的暗影整图）
+        val nsd = File(dir, "nsd.png")
+        if (!nsd.isFile) return false
         if (!day.isFile) return true
-        return runCatching { !night.readBytes().contentEquals(day.readBytes()) }.getOrDefault(false)
+        return runCatching { !nsd.readBytes().contentEquals(day.readBytes()) }.getOrDefault(false)
     }
 
     companion object {
