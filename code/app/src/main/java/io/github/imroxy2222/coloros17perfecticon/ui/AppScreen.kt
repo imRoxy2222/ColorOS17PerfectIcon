@@ -356,6 +356,10 @@ fun AppScreen() {
                     onExport = { startExport() },
                     onCancelExport = { state.exportJob?.cancel() },
                     onShare = { state.resultUri?.let { share(it) } },
+                    onResetExport = {
+                        state.resultUri = null
+                        state.message = null
+                    },
                 )
             },
         ) { padding ->
@@ -694,6 +698,7 @@ private fun BottomPanel(
     onExport: () -> Unit,
     onCancelExport: () -> Unit,
     onShare: () -> Unit,
+    onResetExport: () -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -758,15 +763,26 @@ private fun BottomPanel(
                     }
                     if (state.resultUri != null) {
                         Spacer(Modifier.height(10.dp))
-                        Button(
-                            onClick = onShare,
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(
-                                color = MiuixTheme.colorScheme.primary,
-                                contentColor = MiuixTheme.colorScheme.onPrimary,
-                            ),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("分享")
+                            TextButton(
+                                text = "继续导出",
+                                onClick = onResetExport,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Button(
+                                onClick = onShare,
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(
+                                    color = MiuixTheme.colorScheme.primary,
+                                    contentColor = MiuixTheme.colorScheme.onPrimary,
+                                ),
+                            ) {
+                                Text("分享")
+                            }
                         }
                     } else {
                         Row(
