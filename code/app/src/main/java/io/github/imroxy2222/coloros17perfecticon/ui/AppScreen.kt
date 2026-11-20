@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -439,7 +440,7 @@ fun AppScreen() {
                                     ) {
                                         itemsIndexed(filtered, key = { _, item -> item.pkg }) { index, item ->
                                             if (index > 0) {
-                                                HorizontalDivider(Modifier.padding(start = 70.dp))
+                                                HorizontalDivider(Modifier.padding(start = 122.dp))
                                             }
                                             AppRow(
                                                 item = item,
@@ -721,48 +722,67 @@ private fun EmptyState(
 
 @Composable
 private fun AppRow(item: AppItem, selected: Boolean, onToggle: () -> Unit) {
-    BasicComponent(
-        startAction = {
-            Box(
-                modifier = Modifier
-                    .size(46.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MiuixTheme.colorScheme.surfaceContainerHighest),
-                contentAlignment = Alignment.Center,
-            ) {
-                item.preview?.let { preview ->
-                    Image(
-                        bitmap = preview,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-            }
-        },
-        endActions = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                StatusTag(state = item.state)
-                Spacer(Modifier.width(6.dp))
-                Checkbox(
-                    state = ToggleableState(selected),
-                    onClick = onToggle,
+    // 不用 BasicComponent：它的 start 槽在文本偏长时会按比例压缩，两个预览图标会被压扁
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconPreview(item.preview, "亮")
+        Spacer(Modifier.width(6.dp))
+        IconPreview(item.previewNight, "暗")
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                item.label,
+                modifier = Modifier.basicMarquee(),
+                maxLines = 1,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                item.pkg,
+                modifier = Modifier.basicMarquee(),
+                fontSize = 12.sp,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+            )
+        }
+        Spacer(Modifier.width(6.dp))
+        StatusTag(state = item.state)
+        Spacer(Modifier.width(6.dp))
+        Checkbox(
+            state = ToggleableState(selected),
+            onClick = onToggle,
+        )
+    }
+}
+
+@Composable
+private fun IconPreview(bitmap: androidx.compose.ui.graphics.ImageBitmap?, label: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(46.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MiuixTheme.colorScheme.surfaceContainerHighest),
+            contentAlignment = Alignment.Center,
+        ) {
+            bitmap?.let {
+                Image(
+                    bitmap = it,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
-        },
-        onClick = onToggle,
-    ) {
-        Text(
-            item.label,
-            modifier = Modifier.basicMarquee(),
-            maxLines = 1,
-        )
+        }
         Spacer(Modifier.height(2.dp))
         Text(
-            item.pkg,
-            modifier = Modifier.basicMarquee(),
-            fontSize = 12.sp,
+            label,
+            fontSize = 9.sp,
             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            maxLines = 1,
         )
     }
 }

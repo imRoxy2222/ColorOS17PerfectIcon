@@ -29,4 +29,6 @@ data class AppItem(
     val adaptive: Boolean,
     val monochrome: Boolean,
     val preview: ImageBitmap?,
+    /** 夜间 Configuration 下渲染的图标，用于和 [preview] 并排对比。 */
+    val previewNight: ImageBitmap?,
 )

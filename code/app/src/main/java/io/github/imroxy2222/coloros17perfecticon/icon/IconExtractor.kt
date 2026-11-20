@@ -53,13 +53,14 @@ class IconExtractor(context: Context) {
     }
 
     fun detect(app: LauncherApp, pack: ThemeIconPack): AppItem {
-        val icon = loadIcon(app.pkg, app.iconRes, night = false)
-        val adaptiveIcon = icon as? AdaptiveIconDrawable
+        val dayIcon = loadIcon(app.pkg, app.iconRes, night = false)
+        val nightIcon = loadIcon(app.pkg, app.iconRes, night = true)
+        val adaptiveIcon = dayIcon as? AdaptiveIconDrawable
         val state = when {
             pack.hasNightIcon(app.pkg) -> AdaptState.MODULE
             // 图标包里有这个应用但夜间前景与日间相同：桌面用的仍是包里的图，APK 自带夜间图不会生效
             pack.hasIcon(app.pkg) -> AdaptState.NONE
-            isSelfAdaptive(app.pkg, app.iconRes) -> AdaptState.SELF
+            isSelfAdaptive(dayIcon, nightIcon) -> AdaptState.SELF
             else -> AdaptState.NONE
         }
         return AppItem(
@@ -69,14 +70,14 @@ class IconExtractor(context: Context) {
             state = state,
             adaptive = adaptiveIcon != null,
             monochrome = adaptiveIcon?.let { hasMonochrome(it) } ?: false,
-            preview = icon?.let { renderPreview(it, PREVIEW_SIZE) }?.asImageBitmap(),
+            preview = dayIcon?.let { renderPreview(it, PREVIEW_SIZE) }?.asImageBitmap(),
+            previewNight = nightIcon?.let { renderPreview(it, PREVIEW_SIZE) }?.asImageBitmap(),
         )
     }
 
     /** 分别用日间/夜间 Configuration 渲染图标，比较差异判断 APK 自身是否带夜间图标。 */
-    private fun isSelfAdaptive(pkg: String, iconRes: Int): Boolean {
-        val day = loadIcon(pkg, iconRes, night = false) ?: return false
-        val night = loadIcon(pkg, iconRes, night = true) ?: return false
+    private fun isSelfAdaptive(day: Drawable?, night: Drawable?): Boolean {
+        if (day == null || night == null) return false
         val dayBitmap = runCatching { renderComposite(day, PREVIEW_SIZE) }.getOrNull() ?: return false
         val nightBitmap = runCatching { renderComposite(night, PREVIEW_SIZE) }.getOrNull() ?: return false
         val ratio = diffRatio(dayBitmap, nightBitmap)
