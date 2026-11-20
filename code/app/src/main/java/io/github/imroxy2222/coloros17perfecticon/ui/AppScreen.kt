@@ -58,13 +58,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -283,13 +286,13 @@ fun AppScreen() {
     }
     val selectedCount = state.selected.count { it.value }
     val exportCount = if (selectedCount > 0) selectedCount else filtered.size
+    val pageLayer = rememberGraphicsLayer()
 
     Box(Modifier.fillMaxSize().background(MiuixTheme.colorScheme.surface)) {
         Scaffold(
-            modifier = Modifier.graphicsLayer {
-                if (drawerOpen) {
-                    renderEffect = BlurEffect(36f, 36f, TileMode.Clamp)
-                }
+            modifier = Modifier.drawWithContent {
+                pageLayer.record { this@drawWithContent.drawContent() }
+                drawLayer(pageLayer)
             },
             topBar = {
                 SmallTopAppBar(
@@ -441,14 +444,31 @@ fun AppScreen() {
             enter = fadeIn(),
             exit = fadeOut(),
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.2f))
-                    .pointerInput(Unit) {
-                        detectTapGestures { drawerOpen = false }
-                    },
-            )
+            Box(Modifier.fillMaxSize()) {
+                // 只模糊抽屉下方的那一块，页面其它区域保持清晰
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .fillMaxHeight()
+                        .width(300.dp)
+                        .clip(RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp))
+                        .graphicsLayer {
+                            renderEffect = BlurEffect(40f, 40f, TileMode.Clamp)
+                        },
+                ) {
+                    Canvas(Modifier.fillMaxSize()) {
+                        drawLayer(pageLayer)
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.2f))
+                        .pointerInput(Unit) {
+                            detectTapGestures { drawerOpen = false }
+                        },
+                )
+            }
         }
 
         AnimatedVisibility(
@@ -457,7 +477,7 @@ fun AppScreen() {
             exit = slideOutHorizontally { -it },
             modifier = Modifier.align(Alignment.CenterStart),
         ) {
-            OptionsDrawer(state = state, onClose = { drawerOpen = false })
+            OptionsDrawer(state = state)
         }
     }
 }
@@ -518,7 +538,8 @@ private fun MoreDots() {
 }
 
 @Composable
-private fun OptionsDrawer(state: UiState, onClose: () -> Unit) {
+private fun OptionsDrawer(state: UiState) {
+    var confirmReset by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier
             .fillMaxHeight()
@@ -532,16 +553,15 @@ private fun OptionsDrawer(state: UiState, onClose: () -> Unit) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 8.dp),
+                .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 "导出选项",
                 style = MiuixTheme.textStyles.title3,
                 fontWeight = FontWeight.Medium,
-                modifier = Modifier.weight(1f),
+                color = MiuixTheme.colorScheme.onSurface,
             )
-            TextButton("完成", onClick = onClose)
         }
         HorizontalDivider()
         Spacer(Modifier.height(8.dp))
@@ -588,6 +608,53 @@ private fun OptionsDrawer(state: UiState, onClose: () -> Unit) {
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
         )
+        Spacer(Modifier.height(24.dp))
+        HorizontalDivider()
+        Spacer(Modifier.height(8.dp))
+        if (confirmReset) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+                Text(
+                    "恢复默认设置？",
+                    style = MiuixTheme.textStyles.body2,
+                    color = MiuixTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    TextButton(
+                        text = "取消",
+                        onClick = { confirmReset = false },
+                        modifier = Modifier.weight(1f),
+                    )
+                    Button(
+                        onClick = {
+                            state.optIncludeAdapted = false
+                            state.optLayers = true
+                            state.optSize = 1024
+                            state.optRoot = false
+                            confirmReset = false
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            color = MiuixTheme.colorScheme.error,
+                            contentColor = MiuixTheme.colorScheme.onPrimary,
+                        ),
+                    ) {
+                        Text("恢复")
+                    }
+                }
+            }
+        } else {
+            TextButton(
+                text = "恢复默认设置",
+                onClick = { confirmReset = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp),
+            )
+        }
         Spacer(Modifier.height(24.dp))
     }
 }
