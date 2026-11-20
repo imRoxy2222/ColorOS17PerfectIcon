@@ -7,6 +7,11 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -61,14 +66,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.state.ToggleableState
@@ -146,6 +154,7 @@ fun AppScreen() {
 
     var drawerOpen by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
+    var page by remember { mutableStateOf(0) }
 
     val snapshot = state.apps.toList()
     val query = state.query
@@ -302,19 +311,21 @@ fun AppScreen() {
                         WindowInsets.safeDrawing.only(WindowInsetsSides.Top),
                     ),
                     navigationIcon = {
-                        IconButton(
-                            onClick = { drawerOpen = true },
-                            modifier = Modifier.padding(start = 12.dp),
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_wrench),
-                                contentDescription = "选项",
-                                tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
-                            )
+                        if (page == 0) {
+                            IconButton(
+                                onClick = { drawerOpen = true },
+                                modifier = Modifier.padding(start = 12.dp),
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_wrench),
+                                    contentDescription = "选项",
+                                    tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                                )
+                            }
                         }
                     },
                     actions = {
-                        Box {
+                        if (page == 0) Box {
                             IconButton(onClick = { menuOpen = true }) {
                                 MoreDots()
                             }
@@ -350,22 +361,28 @@ fun AppScreen() {
                 )
             },
             bottomBar = {
-                BottomPanel(
-                    state = state,
-                    summary = summary,
-                    exportCount = exportCount,
-                    allFilteredSelected = allFilteredSelected,
-                    onSelectAll = { toggleSelectAll() },
-                    onExport = { startExport() },
-                    onCancelExport = { state.exportJob?.cancel() },
-                    onShare = { state.resultUri?.let { share(it) } },
-                    onResetExport = {
-                        state.resultUri = null
-                        state.message = null
-                    },
-                )
+                Column {
+                    if (page == 0) {
+                        BottomPanel(
+                            state = state,
+                            summary = summary,
+                            exportCount = exportCount,
+                            allFilteredSelected = allFilteredSelected,
+                            onSelectAll = { toggleSelectAll() },
+                            onExport = { startExport() },
+                            onCancelExport = { state.exportJob?.cancel() },
+                            onShare = { state.resultUri?.let { share(it) } },
+                            onResetExport = {
+                                state.resultUri = null
+                                state.message = null
+                            },
+                        )
+                    }
+                    BottomTabBar(selected = page, onSelect = { page = it })
+                }
             },
         ) { padding ->
+            if (page == 0) {
             Column(
                 modifier = Modifier
                     .padding(padding)
@@ -436,6 +453,9 @@ fun AppScreen() {
                         onClick = { scope.launch { listState.animateScrollToItem(0) } },
                     )
                 }
+            }
+            } else {
+                AboutPage(Modifier.padding(padding))
             }
         }
 
@@ -770,8 +790,8 @@ private fun BottomPanel(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 12.dp)
+            .padding(top = 6.dp),
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -880,3 +900,133 @@ private fun BottomPanel(
         }
     }
 }
+
+@Composable
+private fun BottomTabBar(selected: Int, onSelect: (Int) -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MiuixTheme.colorScheme.surface)
+            .navigationBarsPadding(),
+    ) {
+        HorizontalDivider()
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+        ) {
+            listOf("功能", "关于").forEachIndexed { index, label ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable { onSelect(index) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = label,
+                        fontSize = 14.sp,
+                        fontWeight = if (selected == index) FontWeight.Medium else FontWeight.Normal,
+                        color = if (selected == index) {
+                            MiuixTheme.colorScheme.primary
+                        } else {
+                            MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AboutPage(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val version = remember {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrNull().orEmpty()
+    }
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(top = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        FlowingIconBox(version)
+        Spacer(Modifier.height(24.dp))
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp),
+            insideMargin = PaddingValues(0.dp),
+        ) {
+            BasicComponent(
+                title = "GitHub",
+                summary = ABOUT_REPO,
+                onClick = {
+                    runCatching {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse("https://$ABOUT_REPO")),
+                        )
+                    }
+                },
+            )
+        }
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun FlowingIconBox(version: String) {
+    val screenWidth = LocalConfiguration.current.screenWidthDp
+    val boxSize = (screenWidth * 0.85f).dp
+    val transition = rememberInfiniteTransition(label = "flow")
+    val angle by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 6000, easing = LinearEasing),
+        ),
+        label = "angle",
+    )
+    Box(
+        modifier = Modifier
+            .size(boxSize)
+            .clip(RoundedCornerShape(28.dp))
+            .background(Color(0xFF111317)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            rotate(angle) {
+                drawRect(
+                    brush = Brush.sweepGradient(
+                        0f to Color.Transparent,
+                        0.12f to Color.White.copy(alpha = 0.35f),
+                        0.30f to Color.Transparent,
+                        0.62f to Color(0x33A8CCFF),
+                        0.80f to Color.Transparent,
+                        1f to Color.Transparent,
+                    ),
+                )
+            }
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                "完美图标",
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "版本 ${version.ifEmpty { "1.0" }}",
+                fontSize = 12.sp,
+                color = Color.White.copy(alpha = 0.6f),
+            )
+        }
+    }
+}
+
+private const val ABOUT_REPO = "github.com/imroxy2222/ColorOS17PerfectIcon"
