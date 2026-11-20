@@ -240,7 +240,7 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
             || `bg.png` | 背景层（底板） | 否 | 图标底色 / 底板层，通常是纯色或渐变 |
             || `fg.png` | 前景层（图形） | 是 | 图形本身，四角透明，叠加在 `bg.png` 上 |
             || `mono.png` | 单色层 | 是 | 纯黑图形 + alpha，供系统按主题色重新着色 |
-            || `icon2.png` | APK 自带夜间图 | — | 只有 APK 自身提供不同夜间图标时才存在，仅供参考 |
+            || `icon2.png` | APK 自带夜间图 | — | 只有 APK 自身提供不同夜间图标时才存在，仅供参考，不要直接当 `rec_night.png` |
             || `raw/*` | APK 原始素材 | — | 原始 mipmap / drawable，需要更高精度时可回查 |
             |
             |透明底的 PNG 必须是 ARGB_8888、真正的 PNG（不是改扩展名），图形之外区域 alpha = 0。
@@ -254,8 +254,10 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
             || `bg.png` | `recbg.png` | 240×240 | 不透明、铺满整张画布；不要自己画圆角，形状由桌面裁切 |
             || `fg.png` | `recfg.png` | 240×240 | 透明底图形，居中，不贴边 |
             || `mono.png` | `monochrome.png` | 240×240 | 图形为纯黑 `#000000`，靠 alpha 表达形状 |
-            || `icon.png` | 不入包 | — | 只做效果对照 |
-            || `icon2.png` | 不入包 | — | 只做参考，真正的夜间素材要自己生成 `rec_night.png` |
+            || 需自己生成 | `rec_night.png` | 240×240 | 暗色前景，透明底，内容必须与 `recfg.png` 不同，做法见第 4 节 |
+            |
+            |`rec_night.png` 没有对应的导出文件，需要你在 `recfg.png` 基础上调色生成，这是本次工作的重点。
+            |`icon.png` / `icon2.png` 只是参考整图，不放进模块。
             |
             |转换方法：把导出的 PNG 直接等比缩放到 240×240（高质量重采样，保留 alpha）即可。
             |`fg.png` 已经按 108dp 画布导出、图形位于中央 72/108 安全区内，缩放时**不要再裁切或放大**，
