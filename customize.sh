@@ -1,4 +1,4 @@
-SKIPUNZIP=true
+SKIPUNZIP=1
 SKIPMOUNT=false
 PROPFILE=true
 POSTFSDATA=true
@@ -6,15 +6,30 @@ LATESTARTSERVICE=true
 
 unzip -o "$ZIPFILE" -x 'META-INF/*' -d $MODPATH >&2
 
-ui_print "- 正在同步已安装应用的图标"
+. "$MODPATH/icon_sync.sh"
+
+ICON_ARCHIVE="$MODPATH/icons.zip"
 SOURCE_ICONS="$MODPATH/my_product/media/theme/uxicons/hdpi"
 TARGET_ICONS="/data/oplus/uxicons"
 
-if [ -d "$SOURCE_ICONS" ]; then
-  . "$MODPATH/icon_sync.sh"
-  sync_icons "$SOURCE_ICONS" "$TARGET_ICONS" full
+# 包列表只取一次，解压和同步都复用，避免反复调用 pm
+PKG_LIST="$MODPATH/.pkg-list"
+_sync_packages > "$PKG_LIST"
+
+ui_print "- 安装耗时约1-5分钟,请耐心等待"
+
+if [ -f "$ICON_ARCHIVE" ]; then
+  ui_print "- 正在解压本机已安装应用的图标"
+  extract_icons "$ICON_ARCHIVE" "$SOURCE_ICONS" full "$PKG_LIST"
 else
-  ui_print "! 压缩包内未找到 hdpi 文件夹，跳过图标同步"
+  ui_print "! 压缩包内未找到图标归档，跳过图标解压"
+fi
+
+if [ -d "$SOURCE_ICONS" ]; then
+  ui_print "- 正在同步图标到 $TARGET_ICONS"
+  sync_icons "$SOURCE_ICONS" "$TARGET_ICONS" full "$PKG_LIST"
+else
+  ui_print "! 未找到图标文件夹，跳过图标同步"
 fi
 
 set_perm_recursive $MODPATH 0 0 0777 0777
@@ -27,9 +42,5 @@ if [ -d "${CommonPath}" ]; then
 fi
 
 ui_print "- 写入完成！"
-ui_print "- 加入Q群一起交流吧~ "
 
-Testing=`pm list package | grep -w 'com.tencent.mobileqq'`
-if [[ "$Testing" != "" ]];then
-  am start -d 'mqqapi://card/show_pslcard?src_type=internal&version=1&uin=1070892396&card_type=group&source=qrcode' >/dev/null 2>&1
-fi
+rm -f "$PKG_LIST"

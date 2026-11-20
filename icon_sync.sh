@@ -4,7 +4,10 @@
 #
 # 用法：
 #   . icon_sync.sh
-#   sync_icons <源目录> <目标目录> [full|incremental]
+#   extract_icons <图标归档> <目标目录> [full|incremental] [包名列表文件]
+#   sync_icons    <源目录>   <目标目录> [full|incremental] [包名列表文件]
+#
+# 说明：包名列表建议由调用方只取一次后传入，避免在 ColorOS 上反复调用 pm。
 
 _sync_msg() {
   if type ui_print >/dev/null 2>&1; then
@@ -27,25 +30,133 @@ _sync_do_copy() {
   mkdir -p "$2" && cp -rf "$1/." "$2/"
 }
 
-# 无法取得包名列表时（仅 full 模式）退回全量复制
-_sync_copy_all() {
-  for _d in "$1"/*; do
+# 只给源目录里实际存在的应用设置权限，避免每次遍历目标目录里历史遗留的几千个旧目录
+_sync_set_perm() {
+  _s=$1
+  _t=$2
+  set --
+  for _d in "$_s"/*; do
     [ -d "$_d" ] || continue
-    _n=${_d##*/}
-    case "$_n" in
-      temp_*|.*|*.bak) continue ;;
-    esac
-    _sync_do_copy "$_d" "$2/$_n"
+    set -- "$@" "$_t/${_d##*/}"
   done
+  [ $# -gt 0 ] && chmod -R 0777 "$@" 2>/dev/null
+  return 0
+}
+
+# 找到可用的 unzip（安装阶段在安装器 PATH 里，开机阶段回退到 KernelSU 自带 busybox）
+_sync_unzip() {
+  if command -v unzip >/dev/null 2>&1; then
+    echo unzip
+    return 0
+  fi
+  for _bb in /data/adb/ksu/bin/busybox /data/adb/magisk/busybox; do
+    if [ -x "$_bb" ]; then
+      echo "$_bb unzip"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# 解析包名列表：优先使用调用方缓存的列表文件；否则自己取（incremental 重试等待 pm 就绪）
+# 结果：_pkgfile 为列表文件，_own_pkgfile=1 表示需要调用方负责清理
+_sync_resolve_pkgs() {
+  _given=$1
+  _r_dst=$2
+  _r_mode=$3
+
+  if [ -n "$_given" ] && [ -e "$_given" ]; then
+    _pkgfile=$_given
+    _own_pkgfile=0
+    return 0
+  fi
+
+  _pkgfile="$_r_dst/.pm-list.$$"
+  _own_pkgfile=1
+  _sync_packages > "$_pkgfile"
+
+  if [ "$_r_mode" = incremental ]; then
+    _r_retry=0
+    while [ ! -s "$_pkgfile" ] && [ "$_r_retry" -lt 3 ]; do
+      sleep 5
+      _sync_packages > "$_pkgfile"
+      _r_retry=$((_r_retry + 1))
+    done
+  fi
+
+  return 0
+}
+
+# 从 icons.zip 里按已安装应用的包名解出图标目录
+extract_icons() {
+  _arc=$1
+  _dst=$2
+  _mode=${3:-full}
+  _given=${4:-}
+
+  if [ ! -f "$_arc" ]; then
+    _sync_msg "! 图标归档不存在：$_arc"
+    return 1
+  fi
+  mkdir -p "$_dst" || { _sync_msg "! 无法创建目录：$_dst"; return 1; }
+
+  _uz=$(_sync_unzip)
+  if [ -z "$_uz" ]; then
+    _sync_msg "! 未找到 unzip，无法解压图标归档"
+    return 1
+  fi
+
+  _sync_resolve_pkgs "$_given" "$_dst" "$_mode"
+
+  if [ ! -s "$_pkgfile" ]; then
+    [ "$_own_pkgfile" = 1 ] && rm -f "$_pkgfile"
+    if [ "$_mode" = incremental ]; then
+      _sync_msg "! 暂未获取到应用列表，跳过本次图标解压"
+      return 0
+    fi
+    _sync_msg "! 获取应用列表失败，回退为解压全部图标"
+    $_uz -o -d "$_dst" "$_arc" >/dev/null 2>&1
+    return 0
+  fi
+
+  _cnt=0
+  set --
+  while IFS= read -r _pkg; do
+    [ -n "$_pkg" ] || continue
+
+    if [ "$_mode" = incremental ]; then
+      # 已有对应目录的应用不再重复解压
+      _has=
+      for _e in "$_dst/$_pkg" "$_dst/$_pkg".* "$_dst/$_pkg"#*; do
+        [ -e "$_e" ] && { _has=1; break; }
+      done
+      [ -n "$_has" ] && continue
+    fi
+
+    # 一个模式覆盖：包名目录、包名.Activity 目录、包名#Activity 目录，
+    # 以及 “包名A和包名B” 这类合并目录（两侧任一半安装都能命中）
+    set -- "$@" "*$_pkg*/*"
+    _cnt=$((_cnt + 1))
+  done < "$_pkgfile"
+
+  [ "$_own_pkgfile" = 1 ] && rm -f "$_pkgfile"
+
+  if [ "$_cnt" -eq 0 ]; then
+    _sync_msg "- 没有需要解压图标的应用"
+    return 0
+  fi
+
+  # 一次 unzip 解出全部命中的目录，避免逐个应用起进程
+  $_uz -o -d "$_dst" "$_arc" "$@" >/dev/null 2>&1
+
+  _sync_msg "- 已为 $_cnt 个应用解压图标"
 }
 
 sync_icons() {
   _src=$1
   _dst=$2
   _mode=${3:-full}
-  _copied=0
-  _kept=0
-  _hash=0
+  _given=${4:-}
 
   if [ ! -d "$_src" ]; then
     _sync_msg "! 图标源目录不存在：$_src"
@@ -53,28 +164,28 @@ sync_icons() {
   fi
   mkdir -p "$_dst" || { _sync_msg "! 无法创建目录：$_dst"; return 1; }
 
-  _pkgfile="$_dst/.pm-list.$$"
-  _sync_packages > "$_pkgfile"
-
-  # 开机阶段 pm 可能还没就绪，incremental 模式重试几次
-  if [ "$_mode" = incremental ]; then
-    _retry=0
-    while [ ! -s "$_pkgfile" ] && [ "$_retry" -lt 3 ]; do
-      sleep 5
-      _sync_packages > "$_pkgfile"
-      _retry=$((_retry + 1))
+  # 全量模式：源目录在解压阶段已按已安装应用过滤，整目录一次复制即可
+  if [ "$_mode" = full ]; then
+    _n=0
+    for _d in "$_src"/*; do
+      [ -d "$_d" ] && _n=$((_n + 1))
     done
+    _sync_do_copy "$_src" "$_dst"
+    _sync_set_perm "$_src" "$_dst"
+    _sync_msg "- 图标同步完成：新增 $_n 个"
+    return 0
   fi
 
+  _copied=0
+  _kept=0
+  _hash=0
+  _newdirs=
+
+  _sync_resolve_pkgs "$_given" "$_dst" "$_mode"
+
   if [ ! -s "$_pkgfile" ]; then
-    rm -f "$_pkgfile"
-    if [ "$_mode" = incremental ]; then
-      _sync_msg "! 暂未获取到应用列表，跳过本次同步"
-      return 0
-    fi
-    _sync_msg "! 获取应用列表失败，回退为复制全部图标"
-    _sync_copy_all "$_src" "$_dst"
-    chmod -R 0777 "$_dst" 2>/dev/null
+    [ "$_own_pkgfile" = 1 ] && rm -f "$_pkgfile"
+    _sync_msg "! 暂未获取到应用列表，跳过本次同步"
     return 0
   fi
 
@@ -83,10 +194,13 @@ sync_icons() {
 
     # 1) 目录名就是包名
     if [ -d "$_src/$_pkg" ]; then
-      if [ "$_mode" = incremental ] && [ -d "$_dst/$_pkg" ]; then
+      if [ -d "$_dst/$_pkg" ]; then
         _kept=$((_kept + 1))
       else
-        _sync_do_copy "$_src/$_pkg" "$_dst/$_pkg" && _copied=$((_copied + 1))
+        _sync_do_copy "$_src/$_pkg" "$_dst/$_pkg" && {
+          _copied=$((_copied + 1))
+          _newdirs="$_newdirs $_dst/$_pkg"
+        }
       fi
     fi
 
@@ -94,10 +208,13 @@ sync_icons() {
     for _d in "$_src/$_pkg".*; do
       [ -d "$_d" ] || continue
       _n=${_d##*/}
-      if [ "$_mode" = incremental ] && [ -d "$_dst/$_n" ]; then
+      if [ -d "$_dst/$_n" ]; then
         _kept=$((_kept + 1))
       else
-        _sync_do_copy "$_d" "$_dst/$_n" && _copied=$((_copied + 1))
+        _sync_do_copy "$_d" "$_dst/$_n" && {
+          _copied=$((_copied + 1))
+          _newdirs="$_newdirs $_dst/$_n"
+        }
       fi
     done
   done < "$_pkgfile"
@@ -109,10 +226,13 @@ sync_icons() {
     _a=${_n%%和*}
     _b=${_n#*和}
     if grep -qxF "$_a" "$_pkgfile" || grep -qxF "$_b" "$_pkgfile"; then
-      if [ "$_mode" = incremental ] && [ -d "$_dst/$_n" ]; then
+      if [ -d "$_dst/$_n" ]; then
         _kept=$((_kept + 1))
       else
-        _sync_do_copy "$_d" "$_dst/$_n" && _copied=$((_copied + 1))
+        _sync_do_copy "$_d" "$_dst/$_n" && {
+          _copied=$((_copied + 1))
+          _newdirs="$_newdirs $_dst/$_n"
+        }
       fi
     fi
   done
@@ -122,8 +242,10 @@ sync_icons() {
     [ -d "$_d" ] && _hash=$((_hash + 1))
   done
 
-  rm -f "$_pkgfile"
-  [ "$_copied" -gt 0 ] && chmod -R 0777 "$_dst" 2>/dev/null
+  [ "$_own_pkgfile" = 1 ] && rm -f "$_pkgfile"
+
+  # 只给本次新增的目录设置权限
+  [ -n "$_newdirs" ] && chmod -R 0777 $_newdirs 2>/dev/null
 
   _sync_msg "- 图标同步完成：新增 $_copied 个，已存在 $_kept 个，跳过哈希目录 $_hash 个"
 }

@@ -19,11 +19,17 @@ import argparse
 import os
 import subprocess
 import sys
+import tempfile
 import time
 import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+
+# 图标源目录：打包时不再散放这上万个文件，而是压成一个不压缩的内部归档，
+# 安装脚本再按本机已安装的包名按需解出，避免刷写时逐个小文件写入。
+ICON_ROOT = ROOT / "my_product" / "media" / "theme" / "uxicons" / "hdpi"
+ICON_ARCHIVE_NAME = "icons.zip"
 
 # 整个目录跳过（按目录名，任意层级匹配）
 EXCLUDE_DIRS = {
@@ -103,6 +109,9 @@ def iter_files(exclude_paths: set[Path]):
     """按稳定顺序遍历需要打包的文件。"""
     for dirpath, dirnames, filenames in os.walk(ROOT):
         current = Path(dirpath)
+        # 图标目录单独打包成 icons.zip，不逐个写入模块 zip
+        if current == ICON_ROOT or ICON_ROOT in current.parents:
+            continue
         dirnames[:] = sorted(
             d for d in dirnames
             if d not in EXCLUDE_DIRS and not d.startswith(".")
@@ -118,6 +127,24 @@ def iter_files(exclude_paths: set[Path]):
             if path.suffix.lower() in EXCLUDE_SUFFIXES and name != KEEP_ZIP:
                 continue
             yield path, path.relative_to(ROOT)
+
+
+def collect_icon_files() -> list[Path]:
+    """hdpi 下的全部图标文件（按路径排序，保证产物稳定）。"""
+    if not ICON_ROOT.is_dir():
+        return []
+    return sorted(p for p in ICON_ROOT.rglob("*") if p.is_file())
+
+
+def write_icon_archive(dest: Path, icon_files: list[Path]) -> None:
+    """把图标打成一个不压缩的 zip：安装时可按包名随机寻址，只读需要的条目。"""
+    with zipfile.ZipFile(dest, "w", compression=zipfile.ZIP_STORED) as zf:
+        for path in icon_files:
+            info = zipfile.ZipInfo(path.relative_to(ICON_ROOT).as_posix())
+            info.compress_type = zipfile.ZIP_STORED
+            info.date_time = time.localtime(path.stat().st_mtime)[:6]
+            info.external_attr = (0o100000 | 0o644) << 16
+            zf.writestr(info, path.read_bytes())
 
 
 def build(output: Path, quiet: bool = False) -> Path:
@@ -137,32 +164,45 @@ def build(output: Path, quiet: bool = False) -> Path:
     exclude_paths = {output, ROOT / Path(__file__).name}
 
     files = list(iter_files(exclude_paths))
+    icon_files = collect_icon_files()
     total_size = 0
 
-    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
-        for path, rel in files:
-            data = path.read_bytes()
-            arcname = rel.as_posix()
-            if arcname == "module.prop" and commit_count is not None:
-                data = apply_commit_version(data, commit_count)
-            total_size += len(data)
+    with tempfile.TemporaryDirectory(dir=output.parent) as tmpdir:
+        icon_archive = Path(tmpdir) / ICON_ARCHIVE_NAME
+        write_icon_archive(icon_archive, icon_files)
+        icon_archive_size = icon_archive.stat().st_size
 
-            info = zipfile.ZipInfo(arcname)
-            info.compress_type = zipfile.ZIP_DEFLATED
-            info.date_time = time.localtime(path.stat().st_mtime)[:6]
-            mode = 0o755 if path.name in EXECUTABLE_FILES else 0o644
-            info.external_attr = (0o100000 | mode) << 16  # 保留 Unix 权限位
-            zf.writestr(info, data, compresslevel=9)
+        with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+            for path, rel in files:
+                data = path.read_bytes()
+                arcname = rel.as_posix()
+                if arcname == "module.prop" and commit_count is not None:
+                    data = apply_commit_version(data, commit_count)
+                total_size += len(data)
 
-            if not quiet:
-                print(f"  + {arcname}")
+                info = zipfile.ZipInfo(arcname)
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.date_time = time.localtime(path.stat().st_mtime)[:6]
+                mode = 0o755 if path.name in EXECUTABLE_FILES else 0o644
+                info.external_attr = (0o100000 | mode) << 16  # 保留 Unix 权限位
+                zf.writestr(info, data, compresslevel=9)
+
+                if not quiet:
+                    print(f"  + {arcname}")
+
+            if icon_files:
+                # 内部归档已是不压缩数据，外层也用 STORE，避免白耗 CPU 和解压时间
+                zf.write(icon_archive, arcname=ICON_ARCHIVE_NAME, compress_type=zipfile.ZIP_STORED)
+                total_size += icon_archive_size
+                if not quiet:
+                    print(f"  + {ICON_ARCHIVE_NAME}（{len(icon_files)} 个图标文件）")
 
     if not quiet:
         excluded = sorted(EXCLUDE_DIRS & {p.name for p in ROOT.iterdir() if p.is_dir()})
         print()
         print(f"系统      : {sys.platform}")
         print(f"模块      : {module_id} {commit_count if commit_count is not None else version}")
-        print(f"文件数量  : {len(files)}")
+        print(f"文件数量  : {len(files)}（另有 {len(icon_files)} 个图标打进 {ICON_ARCHIVE_NAME}）")
         print(f"原始大小  : {total_size / 1024 / 1024:.2f} MiB")
         print(f"压缩后    : {output.stat().st_size / 1024 / 1024:.2f} MiB")
         print(f"输出      : {output}")
