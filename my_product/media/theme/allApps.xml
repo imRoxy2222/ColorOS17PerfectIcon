@@ -1194,6 +1194,7 @@
     <icon name="com.sohu.inputmethod.sogouoem" package="com.sohu.inputmethod.sogouoem"/>
     <icon name="com.ss.android.article.news" package="com.ss.android.article.news"/>
     <icon name="com.ss.android.article.video" package="com.ss.android.article.video"/>
+    <icon name="com.ss.android.lark" package="com.ss.android.lark"/>
     <icon name="com.ss.android.ugc.aweme" package="com.ss.android.ugc.aweme"/>
     <icon name="com.ss.android.ugc.aweme.lite" package="com.ss.android.ugc.aweme.lite"/>
     <icon name="com.ss.android.ugc.livelite" package="com.ss.android.ugc.livelite"/>

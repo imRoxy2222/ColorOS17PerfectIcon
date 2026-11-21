@@ -1654,6 +1654,7 @@
     <item package="com.ss.android.article.news"/>
     <item package="com.ss.android.article.video"/>
     <item package="com.ss.android.article.video.phone"/>
+    <item package="com.ss.android.lark"/>
     <item package="com.ss.android.auto"/>
     <item package="com.ss.android.ies.ugc.cam"/>
     <item package="com.ss.android.merchant"/>
