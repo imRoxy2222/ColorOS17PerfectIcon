@@ -6,10 +6,10 @@
 素材，还应写进 morph_icons_whitelist.xml。
 
 用法：
-    python3 检查图标适配.py                 # 检查全部目录
-    python3 检查图标适配.py --pkg 关键词     # 只检查名字包含关键词的目录
-    python3 检查图标适配.py --assets        # 额外检查 1×1 三件套是否齐全
-    python3 检查图标适配.py --strict        # 警告也视为失败
+    python3 script/检查图标适配.py                 # 检查全部目录
+    python3 script/检查图标适配.py --pkg 关键词     # 只检查名字包含关键词的目录
+    python3 script/检查图标适配.py --assets        # 额外检查 1×1 三件套是否齐全
+    python3 script/检查图标适配.py --strict        # 警告也视为失败
 
 退出码：0 = 通过；1 = 有错误（--strict 时警告也算错误）。
 """
@@ -21,7 +21,7 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
 THEME = ROOT / "my_product" / "media" / "theme"
 HDPI = THEME / "uxicons" / "hdpi"
 ALL_APPS = THEME / "allApps.xml"

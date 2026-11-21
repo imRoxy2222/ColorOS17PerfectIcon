@@ -2,15 +2,15 @@
 """ColorOS 完美图标 Magisk 模块打包脚本。
 
 Linux / macOS / Windows 通用，自动识别当前系统（其实只需要 Python 3）。
-脚本会自动跳过 code/、doc/、.git/ 等无关内容，在 dist/ 下生成可直接刷入的
+脚本会自动跳过 code/、doc/、script/、.git/ 等无关内容，在 dist/ 下生成可直接刷入的
 Magisk 模块 zip。
 
 用法：
-    python3 打包成magisk模块.py             # 输出 dist/<id>-<version>.zip
-    python3 打包成magisk模块.py -o out.zip  # 指定输出路径
-    python3 打包成magisk模块.py -q          # 静默模式
+    python3 script/打包成magisk模块.py             # 输出 dist/<id>-<version>.zip
+    python3 script/打包成magisk模块.py -o out.zip  # 指定输出路径
+    python3 script/打包成magisk模块.py -q          # 静默模式
 
-Windows 上如果 python 不在 PATH，可尝试 `py 打包成magisk模块.py`。
+Windows 上如果 python 不在 PATH，可尝试 `py script/打包成magisk模块.py`。
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ import time
 import zipfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
 
 # 图标源目录：打包时不再散放这上万个文件，而是压成一个不压缩的内部归档，
 # 安装脚本再按本机已安装的包名按需解出，避免刷写时逐个小文件写入。
@@ -34,7 +34,7 @@ ICON_ARCHIVE_NAME = "icons.zip"
 # 整个目录跳过（按目录名，任意层级匹配）
 EXCLUDE_DIRS = {
     ".git", ".idea", ".vscode", ".trae", "__pycache__",
-    "code", "doc", "dist",
+    "code", "doc", "dist", "script",
 }
 
 # 指定文件名跳过

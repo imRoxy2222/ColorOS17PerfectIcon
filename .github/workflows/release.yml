@@ -128,7 +128,7 @@ jobs:
         run: |
           CODE=$(git rev-list --count HEAD)
           OUT="完美图标模块_${CODE}_适配${{ steps.adapted.outputs.count }}.zip"
-          python3 打包成magisk模块.py -q -o "$OUT"
+          python3 script/打包成magisk模块.py -q -o "$OUT"
           echo "name=$OUT" >> "$GITHUB_OUTPUT"
 
       - name: 生成 update.json
