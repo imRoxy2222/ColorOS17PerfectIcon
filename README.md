@@ -10,7 +10,7 @@
 
 - **模块**：把图标素材同步到 `/data/oplus/uxicons/`，让桌面用 ART+ 重绘的图标生效，
   包含 1×1 与 1×2 / 2×1 / 2×2 大图标、暗色前景、单色图标。
-- **应用（`完美图标.apk`）**：导入打包好的模块 zip，按 zip 内是否包含该包名标记
+- **应用（`ColorOS17PerfectIcon.apk`）**：导入打包好的模块 zip，按 zip 内是否包含该包名标记
   「已适配 / 未适配」，支持筛选、搜索、多选导出（含分层素材、原始 APK 素材和一份
   说明生成暗色图标的 `README.md`）。
 
@@ -46,7 +46,7 @@ ColorOS17PerfectIcon/
 
 ## 安装模块
 
-从 [Releases](../../releases) 下载 `完美图标模块_*.zip`，在 Magisk / KernelSU 里刷入后重启。
+从 [Releases](../../releases) 下载 `ColorOS17PerfectIcon_*.zip`，在 Magisk / KernelSU 里刷入后重启。
 安装脚本只把**手机上已安装应用**的图标复制到 `/data/oplus/uxicons/`，开机时会再增量同步一次。
 
 模块内置 `updateJson`（指向 `releases/latest/download/update.json`），发版后可以直接在

@@ -144,22 +144,22 @@ jobs:
           if [ "${{ steps.meta.outputs.build_apk }}" = "true" ]; then
             APK="code/app/build/outputs/apk/release/app-release.apk"
             "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK"
-            cp "$APK" "完美图标.apk"
+            cp "$APK" "ColorOS17PerfectIcon.apk"
           else
             echo "复用最近一次 Release 的 APK"
-            if ! gh release download --pattern "完美图标.apk" --dir .; then
-              echo "::error::最近一次 Release 没有 完美图标.apk，请先发一个 <数字>-apk tag"
+            if ! gh release download --pattern "ColorOS17PerfectIcon.apk" --dir .; then
+              echo "::error::最近一次 Release 没有 ColorOS17PerfectIcon.apk，请先发一个 <数字>-apk tag"
               exit 1
             fi
           fi
-          test -s "完美图标.apk"
-          echo "name=完美图标.apk" >> "$GITHUB_OUTPUT"
+          test -s "ColorOS17PerfectIcon.apk"
+          echo "name=ColorOS17PerfectIcon.apk" >> "$GITHUB_OUTPUT"
 
       - name: 打包 Magisk 模块
         id: module
         run: |
           CODE=$(git rev-list --count HEAD)
-          OUT="完美图标模块_${CODE}_适配${{ steps.adapted.outputs.count }}.zip"
+          OUT="ColorOS17PerfectIcon_${CODE}_apps${{ steps.adapted.outputs.count }}.zip"
           python3 script/打包成magisk模块.py -q -o "$OUT"
           echo "name=$OUT" >> "$GITHUB_OUTPUT"
 
