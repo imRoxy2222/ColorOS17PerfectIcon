@@ -96,11 +96,11 @@ def git_commit_count() -> int | None:
 
 
 def apply_commit_version(data: bytes, count: int) -> bytes:
-    """把 module.prop 里的 version / versioncode 改写成 commit 数。"""
+    """把 module.prop 里的 version / versionCode 改写成 commit 数。"""
     lines = []
     for line in data.decode("utf-8").splitlines():
         key = line.split("=", 1)[0].strip() if "=" in line else ""
-        if key in ("version", "versioncode"):
+        if key in ("version", "versionCode"):
             line = f"{key}={count}"
         lines.append(line)
     return ("\n".join(lines) + "\n").encode("utf-8")

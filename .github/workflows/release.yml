@@ -149,7 +149,7 @@ jobs:
               "version": code,
               "versionCode": int(code),
               "zipUrl": f"{base}/releases/download/{tag}/{urllib.parse.quote(zip_name)}",
-              "changelog": f"{base}/releases/tag/{tag}",
+              "changelog": f"{base}/releases/download/{tag}/release_notes.md",
           }
           with open("update.json", "w", encoding="utf-8") as f:
               json.dump(data, f, ensure_ascii=False, indent=2)
@@ -234,3 +234,4 @@ jobs:
             ${{ steps.apk.outputs.name }}
             ${{ steps.module.outputs.name }}
             update.json
+            release_notes.md

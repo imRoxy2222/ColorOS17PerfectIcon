@@ -1,7 +1,7 @@
 id=ColorOSPerfectIcon
 name=ColorOS17完美图标
 version=16.2.8
-versioncode=16.2.8
+versionCode=16.2.8
 author=Roxy2222 / 酷安@眩晕丶/@ZuyQA
 description=ColorOS16/17完美图标计划, 起飞✈️!理论支持C13+,非C16/17自测,不生效尝试给系统桌面ROOT权限,并设置图标使用'经典',同时启用'ART+图标'
 updateJson=https://github.com/imRoxy2222/ColorOS17PerfectIcon/releases/latest/download/update.json
