@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -147,6 +148,23 @@ def write_icon_archive(dest: Path, icon_files: list[Path]) -> None:
             zf.writestr(info, path.read_bytes())
 
 
+def clean_dist(output: Path) -> int:
+    """删除 dist 中除本次输出外的旧产物，返回删除数量。"""
+    dist = ROOT / "dist"
+    if not dist.is_dir():
+        return 0
+    removed = 0
+    for entry in dist.iterdir():
+        if entry.resolve() == output:
+            continue
+        if entry.is_dir() and not entry.is_symlink():
+            shutil.rmtree(entry)
+        else:
+            entry.unlink()
+        removed += 1
+    return removed
+
+
 def build(output: Path, quiet: bool = False) -> Path:
     missing = [f for f in REQUIRED_FILES if not (ROOT / f).is_file()]
     if missing:
@@ -159,6 +177,7 @@ def build(output: Path, quiet: bool = False) -> Path:
 
     output = output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
+    removed = clean_dist(output)
     if output.exists():
         output.unlink()
     exclude_paths = {output, ROOT / Path(__file__).name}
@@ -206,6 +225,8 @@ def build(output: Path, quiet: bool = False) -> Path:
         print(f"原始大小  : {total_size / 1024 / 1024:.2f} MiB")
         print(f"压缩后    : {output.stat().st_size / 1024 / 1024:.2f} MiB")
         print(f"输出      : {output}")
+        if removed:
+            print(f"已清理 dist: {removed} 项旧产物")
         if excluded:
             print(f"已排除目录: {', '.join(excluded)}")
 
