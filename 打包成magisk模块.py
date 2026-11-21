@@ -6,11 +6,11 @@ Linux / macOS / Windows 通用，自动识别当前系统（其实只需要 Pyth
 Magisk 模块 zip。
 
 用法：
-    python build.py                # 输出 dist/<id>-<version>.zip
-    python build.py -o out.zip     # 指定输出路径
-    python build.py -q             # 静默模式
+    python3 打包成magisk模块.py             # 输出 dist/<id>-<version>.zip
+    python3 打包成magisk模块.py -o out.zip  # 指定输出路径
+    python3 打包成magisk模块.py -q          # 静默模式
 
-Windows 上如果 python 不在 PATH，可尝试 `py build.py`。
+Windows 上如果 python 不在 PATH，可尝试 `py 打包成magisk模块.py`。
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ EXCLUDE_DIRS = {
 
 # 指定文件名跳过
 EXCLUDE_FILES = {
-    ".gitignore", ".DS_Store", "Thumbs.db", "desktop.ini", "build.py", "README.md",
+    ".gitignore", ".DS_Store", "Thumbs.db", "desktop.ini", "打包成magisk模块.py", "README.md",
     "update.json",
 }
 

@@ -30,7 +30,7 @@ ColorOS17PerfectIcon/
 ├── module.prop                 # 模块信息
 ├── customize.sh                # 安装时同步图标（icon_sync.sh）
 ├── service.sh                  # 开机增量同步
-├── build.py                    # 打包模块 zip（排除 code/、doc/、dist/）
+├── 打包成magisk模块.py          # 打包模块 zip（排除 code/、doc/、dist/）
 ├── my_product/media/theme/     # 模块主体
 │   ├── allApps.xml             # 图标名 ↔ 包名 映射
 │   ├── drawableMapping.xml     # 参与重绘的包名清单
@@ -71,8 +71,8 @@ cd code
 模块：
 
 ```bash
-python3 build.py                   # 输出 dist/ColorOSart-<version>.zip
-python3 build.py -o out.zip        # 指定输出
+python3 打包成magisk模块.py          # 输出 dist/ColorOSart-<version>.zip
+python3 打包成magisk模块.py -o out.zip # 指定输出
 ```
 
 ## 许可证
