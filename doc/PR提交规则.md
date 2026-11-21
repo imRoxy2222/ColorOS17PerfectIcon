@@ -4,23 +4,39 @@
 
 ---
 
-## 1. 提交粒度：一个 commit 只适配一个应用
+## 1. 合并方式：只允许 Rebase
+
+- PR **只允许使用 Rebase 方式合并**，禁止 Merge commit（创建合并提交）、Squash（压缩成一个提交）等其他合并方式；
+- 提交前请先把分支 rebase 到最新 `main`，保证历史是一条直线：
+
+  ```bash
+  git fetch origin
+  git rebase origin/main
+  git push --force-with-lease
+  ```
+
+- 如果分支里已经出现 Merge commit，请先 rebase 整理掉再提交 PR。
+
+---
+
+## 2. 提交粒度：一个 commit 只适配一个应用
 
 - **一个 commit 只能包含一个应用**的适配内容：该应用的图标目录（`recbg.png`、`recfg.png`、`rec_night.png` 等）以及对应的 `allApps.xml`、`drawableMapping.xml`（如涉及大图标还有 `morph_icons_whitelist.xml`）修改。
 - **一个 PR 可以包含多个 commit**，每个 commit 对应一个应用，便于逐个审查和回滚。
 - 不要把多个应用的图标、XML 修改混在同一个 commit 里。
-- 建议的 commit message：
+- 新增适配软件时，commit message 固定使用以下格式（冒号为英文冒号，后跟一个空格）：
 
   ```text
-  新增适配：微信（com.tencent.mm）
-  更新适配：QQ（com.tencent.mobileqq）
+  新增适配: 软件名（软件包名）
+  新增适配: 微信（com.tencent.mm）
+  更新适配: QQ（com.tencent.mobileqq）
   ```
 
 - `A和B` 这种一个目录覆盖两个包名的情况，按一个应用处理。
 
 ---
 
-## 2. 必须通过适配检查脚本
+## 3. 必须通过适配检查脚本
 
 在仓库根目录执行：
 
@@ -46,7 +62,7 @@ python3 script/检查图标适配.py --pkg <包名关键词> --assets --strict -
 
 ---
 
-## 3. 必须适配 1×1，亮色与暗色都要有
+## 4. 必须适配 1×1，亮色与暗色都要有
 
 - 每个新增应用必须提供 1×1 的三件套：
 
@@ -63,7 +79,7 @@ python3 script/检查图标适配.py --pkg <包名关键词> --assets --strict -
 
 ---
 
-## 4. 图标质量要求
+## 5. 图标质量要求
 
 - **禁止牛皮癣**：图标内不得出现广告、二维码、网址、联系方式、促销文字、水印、角标、边框等与品牌无关的内容。
 - **保持简洁**：图形居中、留白合理，不堆叠无关元素，缩小后仍能辨认。
@@ -73,8 +89,10 @@ python3 script/检查图标适配.py --pkg <包名关键词> --assets --strict -
 
 ---
 
-## 5. 提交前自检清单
+## 6. 提交前自检清单
 
+- [ ] PR 分支已 rebase 到最新 `main`，历史中没有 Merge commit（合并时只用 Rebase）
+- [ ] commit message 使用 `新增适配: 软件名（软件包名）` 格式
 - [ ] 每个 commit 只包含一个应用
 - [ ] 已补齐 `recbg.png`、`recfg.png`、`rec_night.png`
 - [ ] `rec_night.png` 已提供；若前景需要变色，暗色下清晰可辨
