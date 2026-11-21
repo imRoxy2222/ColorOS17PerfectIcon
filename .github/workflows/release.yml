@@ -193,13 +193,71 @@ jobs:
             ${{ steps.module.outputs.name }}
             update.json
 
+      - name: 生成 Release 说明
+        id: notes
+        env:
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          # <数字>-apk tag 与对应数字 tag 同一版本，统一按数字取上一个版本
+          NUM="${TAG%-apk}"
+          if [[ "$NUM" =~ ^[0-9]+$ ]] && [ "$NUM" -gt 1 ]; then
+            PREV="$((NUM - 1))"
+          else
+            PREV=""
+          fi
+          python3 - "$TAG" "$PREV" "$REPO" > release_notes.md <<'PY'
+          import subprocess
+          import sys
+
+          tag, prev, repo = sys.argv[1], sys.argv[2], sys.argv[3]
+          limit = 50
+
+          rev_range = f"{prev}..HEAD" if prev else "HEAD"
+          raw = subprocess.run(
+              ["git", "log", rev_range, "--no-merges", "--pretty=format:%h\t%s"],
+              capture_output=True, text=True, check=True,
+          ).stdout.strip()
+
+          commits = []
+          for line in raw.splitlines():
+              sha, _, subject = line.partition("\t")
+              commits.append(f"- {subject} (`{sha}`)")
+
+          lines = [f"## 更新内容（共 {len(commits)} 条提交）"]
+          if commits:
+              lines += commits[:limit]
+          else:
+              lines.append("- 本次发布没有新的提交")
+
+          rest = commits[limit:]
+          if rest:
+              lines += [
+                  "",
+                  "<details>",
+                  f"<summary>完整变更日志（其余 {len(rest)} 条）</summary>",
+                  "",
+                  *rest,
+                  "",
+                  "</details>",
+              ]
+
+          if prev:
+              lines += [
+                  "",
+                  f"**Full Changelog**: https://github.com/{repo}/compare/{prev}...{tag}",
+              ]
+          print("\n".join(lines))
+          PY
+          echo "path=release_notes.md" >> "$GITHUB_OUTPUT"
+
       - name: 发布 Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
-          generate_release_notes: true
+          body_path: ${{ steps.notes.outputs.path }}
           files: |
             ${{ steps.apk.outputs.name }}
             ${{ steps.module.outputs.name }}
