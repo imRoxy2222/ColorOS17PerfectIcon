@@ -3,7 +3,8 @@ name: Release
 on:
   push:
     tags:
-      # 版本 tag 为纯数字（1、2、3 …），由“校验版本号”步骤把关
+      # 1、2、3 …：只打模块包，复用最近一次 Release 里的 APK
+      # 7-apk：同时构建 APK 和模块包
       - "*"
   workflow_dispatch:
 
@@ -27,29 +28,46 @@ jobs:
           # 需要校验上一个 tag 是否存在
           fetch-tags: true
 
-      - name: 校验版本号
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: 判断构建类型
+        id: meta
         run: |
-          TAG="${GITHUB_REF_NAME}"
-          if ! [[ "$TAG" =~ ^[0-9]+$ ]] || [ "$TAG" -lt 1 ]; then
-            echo "::error::tag 必须是纯数字版本号（1、2、3 …），当前为 $TAG"
-            exit 1
-          fi
-          if [ "$TAG" -gt 1 ]; then
-            PREV=$((TAG - 1))
-            if ! git rev-parse -q --verify "refs/tags/$PREV" >/dev/null; then
-              echo "::error::缺少上一个版本 tag：$PREV，请按顺序发版"
+          BUILD_APK=true
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            TAG="$GITHUB_REF_NAME"
+            if [[ "$TAG" =~ ^([0-9]+)$ ]]; then
+              NUM="${BASH_REMATCH[1]}"
+              BUILD_APK=false
+            elif [[ "$TAG" =~ ^([0-9]+)-apk$ ]]; then
+              NUM="${BASH_REMATCH[1]}"
+              BUILD_APK=true
+            else
+              echo "::error::tag 必须是纯数字（1、2、3 …）或 <数字>-apk（如 7-apk），当前为 $TAG"
+              exit 1
+            fi
+            if [ "$NUM" -lt 1 ]; then
+              echo "::error::tag 版本号必须 >= 1"
+              exit 1
+            fi
+            if [ "$NUM" -gt 1 ] && ! git rev-parse -q --verify "refs/tags/$((NUM - 1))" >/dev/null; then
+              echo "::error::缺少上一个版本 tag：$((NUM - 1))，请按顺序发版"
+              exit 1
+            fi
+            if [ "$BUILD_APK" = true ] && ! git rev-parse -q --verify "refs/tags/$NUM" >/dev/null; then
+              echo "::error::缺少对应的数字 tag：$NUM，请先发 $NUM 再发 $TAG"
               exit 1
             fi
           fi
+          echo "build_apk=$BUILD_APK" >> "$GITHUB_OUTPUT"
 
       - name: 配置 JDK 17
+        if: steps.meta.outputs.build_apk == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
       - name: 安装 SDK 组件
+        if: steps.meta.outputs.build_apk == 'true'
         run: |
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           SDKMANAGER=$(command -v sdkmanager || find "$SDK_ROOT/cmdline-tools" -name sdkmanager -type f | head -n1)
@@ -61,6 +79,7 @@ jobs:
           "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0"
 
       - name: 缓存 Gradle
+        if: steps.meta.outputs.build_apk == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -70,6 +89,7 @@ jobs:
           restore-keys: gradle-${{ runner.os }}-
 
       - name: 还原签名密钥
+        if: steps.meta.outputs.build_apk == 'true'
         env:
           KEYSTORE_FILE: ${{ runner.temp }}/c17-release.jks
         run: |
@@ -77,6 +97,7 @@ jobs:
           test -s "$KEYSTORE_FILE"
 
       - name: 构建 APK
+        if: steps.meta.outputs.build_apk == 'true'
         working-directory: code
         env:
           KEYSTORE_FILE: ${{ runner.temp }}/c17-release.jks
@@ -115,12 +136,23 @@ jobs:
           )
           echo "count=$COUNT" >> "$GITHUB_OUTPUT"
 
-      - name: 校验并重命名 APK
+      - name: 准备 APK
         id: apk
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          APK="code/app/build/outputs/apk/release/app-release.apk"
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK"
-          cp "$APK" "完美图标.apk"
+          if [ "${{ steps.meta.outputs.build_apk }}" = "true" ]; then
+            APK="code/app/build/outputs/apk/release/app-release.apk"
+            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK"
+            cp "$APK" "完美图标.apk"
+          else
+            echo "复用最近一次 Release 的 APK"
+            if ! gh release download --pattern "完美图标.apk" --dir .; then
+              echo "::error::最近一次 Release 没有 完美图标.apk，请先发一个 <数字>-apk tag"
+              exit 1
+            fi
+          fi
+          test -s "完美图标.apk"
           echo "name=完美图标.apk" >> "$GITHUB_OUTPUT"
 
       - name: 打包 Magisk 模块
