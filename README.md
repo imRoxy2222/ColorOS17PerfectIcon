@@ -73,7 +73,7 @@ cd code
 模块：
 
 ```bash
-python3 script/打包成magisk模块.py          # 输出 dist/ColorOSart-<version>.zip
+python3 script/打包成magisk模块.py          # 输出 dist/ColorOSPerfectIcon-<version>.zip
 python3 script/打包成magisk模块.py -o out.zip # 指定输出
 ```
 

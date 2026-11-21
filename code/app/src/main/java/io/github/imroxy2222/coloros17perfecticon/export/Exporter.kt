@@ -228,8 +228,8 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
 
     private fun buildReadme(options: Options, count: Int): String = buildString {
         append("# ColorOS 17 完美图标 · 导出说明\n\n")
-        append("本压缩包由「完美图标」App 导出，用于制作 / 修补 Magisk 模块 **ColorOS16完美图标**")
-        append("（id: `ColorOSart`）里 ColorOS 主题图标（uxicons）的素材。\n\n")
+        append("本压缩包由「完美图标」App 导出，用于制作 / 修补 Magisk 模块 **ColorOS17完美图标**")
+        append("（id: `ColorOSPerfectIcon`）里 ColorOS 主题图标（uxicons）的素材。\n\n")
         append("## 本次导出\n\n")
         append("- 导出时间：").append(stamp()).append('\n')
         append("- 图标尺寸：").append(options.size).append(" px\n")
