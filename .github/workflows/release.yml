@@ -147,9 +147,18 @@ jobs:
             cp "$APK" "ColorOS17PerfectIcon.apk"
           else
             echo "复用最近一次 Release 的 APK"
-            if ! gh release download --pattern "ColorOS17PerfectIcon.apk" --dir .; then
-              echo "::error::最近一次 Release 没有 ColorOS17PerfectIcon.apk，请先发一个 <数字>-apk tag"
+            rm -f -- *.apk
+            if ! gh release download --pattern "*.apk" --dir .; then
+              echo "::error::最近一次 Release 没有可复用的 APK，请先发一个 <数字>-apk tag"
               exit 1
+            fi
+            set -- *.apk
+            if [ "$1" != "ColorOS17PerfectIcon.apk" ]; then
+              echo "::warning::复用名为 $1 的 APK，重命名为 ColorOS17PerfectIcon.apk"
+              mv -- "$1" "ColorOS17PerfectIcon.apk"
+            fi
+            if [ "$#" -gt 1 ]; then
+              echo "::warning::最近一次 Release 有多个 APK，只使用 $1"
             fi
           fi
           test -s "ColorOS17PerfectIcon.apk"
