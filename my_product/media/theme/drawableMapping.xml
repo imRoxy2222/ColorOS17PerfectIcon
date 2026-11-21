@@ -2255,6 +2255,7 @@
     <item package="io.geph.android"/>
     <item package="io.github.forkmaintainers.iceraven"/>
     <item package="io.github.huskydg.memorydetector"/>
+    <item package="io.github.tophtab.lspstore"/>
     <item package="io.github.trojan_gfw.igniter"/>
     <item package="io.github.trojan_gfw.igniter.debug"/>
     <item package="io.iftech.android.box"/>

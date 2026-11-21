@@ -3269,6 +3269,7 @@
     <icon name="io.geph.android" package="io.geph.android"/>
     <icon name="io.github.forkmaintainers.iceraven" package="io.github.forkmaintainers.iceraven"/>
     <icon name="io.github.huskydg.memorydetector" package="io.github.huskydg.memorydetector"/>
+    <icon name="io.github.tophtab.lspstore" package="io.github.tophtab.lspstore"/>
     <icon name="io.github.trojan_gfw.igniter" package="io.github.trojan_gfw.igniter"/>
     <icon name="io.github.trojan_gfw.igniter.debug" package="io.github.trojan_gfw.igniter.debug"/>
     <icon name="io.iftech.android.box" package="io.iftech.android.box"/>
