@@ -305,6 +305,7 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
             |- 不透明整图：适合自带暗色底板的图标，会覆盖系统底板。
             |
             |不再要求 `rec_night.png` 与 `recfg.png` 的 md5 不同。
+            |实测三件套缺一不可：只放 `recfg.png`，或只放 `recbg.png + recfg.png`，桌面不会应用这组覆盖。
             |
             |生成步骤：
             |
