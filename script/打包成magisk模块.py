@@ -45,7 +45,7 @@ EXCLUDE_FILES = {
 }
 
 # 按扩展名跳过；uxicons.zip 例外（uninstall.sh 需要它）
-EXCLUDE_SUFFIXES = {".zip", ".pyc", ".pyo", ".log", ".swp"}
+EXCLUDE_SUFFIXES = {".zip", ".apk", ".pyc", ".pyo", ".log", ".swp"}
 KEEP_ZIP = "uxicons.zip"
 
 # 需要保留可执行权限的文件
