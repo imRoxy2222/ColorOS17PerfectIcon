@@ -41,7 +41,7 @@ python3 script/检查图标适配.py --pkg <包名关键词> --assets --strict -
 说明：
 
 - `--strict` 会让警告也导致失败，对应「没有 warning 也没有 error」的要求；
-- `--assets` 会检查 `recbg.png`、`recfg.png`、`rec_night.png` 是否齐全，以及 `rec_night.png` 是否只是 `recfg.png` 的副本；
+- `--assets` 会检查 `recbg.png`、`recfg.png`、`rec_night.png` 是否齐全；`rec_night.png` 可以与 `recfg.png` 相同（亮暗只差系统底板时这是正常做法）；
 - 全量执行 `--assets` 会暴露仓库里历史素材的问题，因此素材检查只针对本次新增或修改的应用（`--pkg`）。
 
 ---
@@ -57,7 +57,7 @@ python3 script/检查图标适配.py --pkg <包名关键词> --assets --strict -
   | `rec_night.png` | 暗色前景 |
 
 - 亮色和暗色**必须同时适配**，不能只交亮色；
-- `rec_night.png` 不能直接复制 `recfg.png`，暗色模式下图形必须清晰可辨；
+- `rec_night.png` 必须存在；如果亮暗只差系统底板，它可以与 `recfg.png` 相同；如果前景本身需要变色，则提供对应的暗色前景；
 - 1×2 / 2×1 / 2×2 大图标、异形文件夹、`monochrome` 单色图标均为**可选**，不做强制要求；
 - 尺寸、透明通道、目录命名等细节见 [图标规范](图标规范.md) 的 4.1 节。
 
@@ -77,7 +77,7 @@ python3 script/检查图标适配.py --pkg <包名关键词> --assets --strict -
 
 - [ ] 每个 commit 只包含一个应用
 - [ ] 已补齐 `recbg.png`、`recfg.png`、`rec_night.png`
-- [ ] `rec_night.png` 不是 `recfg.png` 的副本，暗色下清晰可辨
+- [ ] `rec_night.png` 已提供；若前景需要变色，暗色下清晰可辨
 - [ ] 已写入 `allApps.xml` 和 `drawableMapping.xml`
 - [ ] 提供大图标素材时，已写入 `morph_icons_whitelist.xml`
 - [ ] `python3 script/检查图标适配.py --strict` 通过，无错误、无警告

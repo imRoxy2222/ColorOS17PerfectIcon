@@ -176,13 +176,6 @@ def main():
                 errors.setdefault(name, []).append(
                     "缺少 1×1 素材：" + "、".join(missing_icons)
                 )
-            else:
-                foreground = (path / "recfg.png").read_bytes()
-                night = (path / "rec_night.png").read_bytes()
-                if foreground == night:
-                    warnings.setdefault(name, []).append(
-                        "rec_night.png 与 recfg.png 完全相同，暗色模式下不会有变化"
-                    )
 
         has_large = any((path / f).is_file() for f in LARGE_ICONS)
         if has_large and not is_covered(name, whitelist) and name not in errors:

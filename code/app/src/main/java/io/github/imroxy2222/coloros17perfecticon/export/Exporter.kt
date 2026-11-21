@@ -285,9 +285,9 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
             || `bg.png` | `recbg.png` | 240×240 | 不透明、铺满整张画布；不要自己画圆角，形状由桌面裁切 |
             || `fg.png` | `recfg.png` | 240×240 | 透明底图形，居中，不贴边 |
             || `mono.png` | `monochrome.png` | 240×240 | 图形为纯黑 `#000000`，靠 alpha 表达形状 |
-            || 需自己生成 | `rec_night.png` | 240×240 | 暗色前景，透明底，内容必须与 `recfg.png` 不同，做法见第 4 节 |
+            || 需自己生成 | `rec_night.png` | 240×240 | 暗色前景；可与 `recfg.png` 相同、单独调色或使用整图，见第 4 节 |
             |
-            |`rec_night.png` 没有对应的导出文件，需要你在 `recfg.png` 基础上调色生成，这是本次工作的重点。
+            |`rec_night.png` 没有对应的导出文件，需要你根据应用情况生成：可与 `recfg.png` 相同、单独调色，或使用带底板的整图，见第 4 节。
             |`icon.png` / `icon2.png` 只是参考整图，不放进模块。
             |
             |转换方法：把导出的 PNG 直接等比缩放到 240×240（高质量重采样，保留 alpha）即可。
@@ -297,25 +297,31 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
             |## 4. 制作黑暗模式图标（重点）
             |
             |桌面的取图顺序是：暗色模式下用 `rec_night.png`，没有就回退到 `recfg.png`。
-            |因此“适配了暗色”等价于：目录里存在 `rec_night.png`，并且它和 `recfg.png` 的内容**确实不同**。
-            |只是把 `recfg.png` 复制一份改名成 `rec_night.png`（内容字节完全一致）等于没有适配，
-            |夜间仍然是白天的图。
+            |暗色底板由系统按当前图标风格生成（通常是黑色/深色渐变），**不会直接显示 `recbg.png` 的亮色底板**。
+            |因此“适配了暗色”等价于：目录里存在 `rec_night.png`。它可以是：
+            |
+            |- 与 `recfg.png` 相同：适合亮暗只差系统底板的图标，这是允许的；
+            |- 单独调色的透明前景：适合夜间需要换前景颜色的图标；
+            |- 不透明整图：适合自带暗色底板的图标，会覆盖系统底板。
+            |
+            |不再要求 `rec_night.png` 与 `recfg.png` 的 md5 不同。
             |
             |生成步骤：
             |
-            |1. 取 `fg.png`，缩放到 240×240，得到日间前景 `recfg.png`。
-            |2. 以 `recfg.png` 为基础调整颜色，得到夜间前景，另存为 `rec_night.png`：
+            |1. 取 `fg.png`，缩放到 240×240，得到亮色前景 `recfg.png`。
+            |2. 需要换前景色时，以 `recfg.png` 为基础调整颜色，另存为 `rec_night.png`：
             |   - 深色 / 低亮度的图形改为白色或浅灰（推荐 `#FFFFFF` 或 `#F2F2F2`）；
             |   - 需要保留品牌色的（微信绿、支付宝蓝等）改用同色系的高亮版本，提高亮度与饱和度；
-            |   - 不要用纯黑或接近黑色的前景，夜间底板上会看不见。
-            |3. `recbg.png` 保持不变（同一个底板，日间夜间共用）。
-            |4. 检查 `rec_night.png` 与 `recfg.png` 不是同一份文件：`md5sum` 必须不同。
+            |   - 不要用纯黑或接近黑色的前景，深色底板上会看不见。
+            |   不需要换色时，直接复制 `recfg.png` 为 `rec_night.png` 即可。
+            |3. `recbg.png` 只用于亮色模式；暗色底板由系统生成/处理，不需要另做。
+            |4. 检查三件套是否齐全。
             |
             |调色建议：
             |
             |- 白色图形最稳，可读性最好，也是官方素材最常见的做法。
             |- 图形外围可以加 1~2px 的半透明描边，避免浅色底板下边缘发糊。
-            |- 不要把 `rec_night.png` 做成整块色板，它必须是透明底 + 图形。
+            |- 通常 `rec_night.png` 是透明底 + 图形；如果应用暗色版本本身就是带底板的整图，也可以用不透明整图覆盖系统底板。
             |
             |## 5. 大图标（可选，OS16 桌面大图标）
             |
@@ -340,13 +346,13 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
             |2. 放入 `recbg.png`、`recfg.png`、`rec_night.png`（有单色需求再加 `monochrome.png`）。
             |3. 文件权限统一 `0777`，文件名全小写，`1x2` 用字母 x。
             |4. 不要放入 `*_temp.png`、`.trashed-*`、`.bak` 目录。
-            |5. 重装模块或重启桌面后验证：切到暗色模式，图标前景应有变化。
+            |5. 重装模块或重启桌面后验证：切到暗色模式，图标应切换为暗色版本（可能只是系统底板变化，前景不一定变）。
             |
             |自检清单：
             |
             |- [ ] `recbg.png` 整张画布不透明，没有透明像素。
-            |- [ ] `recfg.png` / `rec_night.png` 四角完全透明，图形居中不贴边。
-            |- [ ] `rec_night.png` 与 `recfg.png` 的内容不同（例如 `md5sum` 不一致）。
+            |- [ ] `recfg.png` 四角完全透明；`rec_night.png` 若为前景则四角透明，若为整图则允许不透明。
+            |- [ ] `rec_night.png` 已提供；亮暗只差系统底板时允许与 `recfg.png` 相同。
             |- [ ] `monochrome.png` 只有黑色 + alpha，没有彩色像素。
             |- [ ] 目录名与包名完全一致（区分大小写）。
             |
@@ -354,7 +360,7 @@ class Exporter(private val context: Context, private val extractor: IconExtracto
             |
             |- 没有 `bg.png` / `fg.png`：说明该应用不是自适应图标。可从 `icon.png` 手工拆出底板与图形，
             |  或直接把 `icon.png` 缩放到 240×240 当作 `recbg.png`，再单独做一份夜间前景。
-            |- 只有 `rec_night.png`：桌面允许只提供前景层，底板由系统按图标主色补全。
+            |- 只有 `rec_night.png`：暗色模式允许只提供前景层，暗色底板由系统补全。
             |- 包名对不上：`index.json` 里的 `package` 是桌面入口的真实包名，活动级图标可用
             |  `<包名>.<Activity>` 作为目录名。
             |
