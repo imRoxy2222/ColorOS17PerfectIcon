@@ -2877,6 +2877,7 @@
     <icon name="com.tencent.wework.LaunchSplashActivityGovActivity" package="com.tencent.wework.LaunchSplashActivityGovActivity"/>
     <icon name="com.tencent.wework.launch.LaunchSplashEduActivity" package="com.tencent.wework.launch.LaunchSplashEduActivity"/>
     <icon name="com.tencent.wifimanager" package="com.tencent.wifimanager"/>
+    <icon name="com.tencent.workbuddy.app" package="com.tencent.workbuddy.app"/>
     <icon name="com.tencent.xriver" package="com.tencent.xriver"/>
     <icon name="com.tencent.xzj" package="com.tencent.xzj"/>
     <icon name="com.tencent.yqcr" package="com.tencent.yqcr"/>

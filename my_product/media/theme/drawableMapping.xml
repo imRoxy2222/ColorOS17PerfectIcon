@@ -1824,6 +1824,7 @@
     <item package="com.tencent.wework.launch.LaunchSplashEduActivity"/>
     <item package="com.tencent.wework.LaunchSplashActivityGovActivity"/>
     <item package="com.tencent.wifimanager"/>
+    <item package="com.tencent.workbuddy.app"/>
     <item package="com.tencent.xriver"/>
     <item package="com.tencent.xzj"/>
     <item package="com.tencent.yqcr"/>
