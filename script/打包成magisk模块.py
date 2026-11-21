@@ -34,7 +34,7 @@ ICON_ARCHIVE_NAME = "icons.zip"
 # 整个目录跳过（按目录名，任意层级匹配）
 EXCLUDE_DIRS = {
     ".git", ".idea", ".vscode", ".trae", "__pycache__",
-    "code", "doc", "dist", "script",
+    "code", "doc", "dist", "script", "build",
 }
 
 # 指定文件名跳过
