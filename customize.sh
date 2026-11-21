@@ -32,7 +32,9 @@ else
   ui_print "! 未找到图标文件夹，跳过图标同步"
 fi
 
-set_perm_recursive $MODPATH 0 0 0777 0777
+# 图标保持 unzip 解压时的 0644/0755 即可（只需要可读）；
+# 这里只补模块脚本的可执行位，避免逐文件 fork 拖慢安装。
+chmod 0755 "$MODPATH"/*.sh
 
 CommonPath=$MODPATH/common
 
