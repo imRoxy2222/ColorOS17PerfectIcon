@@ -3,8 +3,7 @@ name: Release
 on:
   push:
     tags:
-      # 1、2、3 …：只打模块包，复用最近一次 Release 里的 APK
-      # 7-apk：同时构建 APK 和模块包
+      # 1、2、3 …：每个 tag 都会构建 APK 并打包模块
       - "*"
   workflow_dispatch:
 
@@ -28,22 +27,15 @@ jobs:
           # 需要校验上一个 tag 是否存在
           fetch-tags: true
 
-      - name: 判断构建类型
-        id: meta
+      - name: 校验 tag
         run: |
-          BUILD_APK=true
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then
             TAG="$GITHUB_REF_NAME"
-            if [[ "$TAG" =~ ^([0-9]+)$ ]]; then
-              NUM="${BASH_REMATCH[1]}"
-              BUILD_APK=false
-            elif [[ "$TAG" =~ ^([0-9]+)-apk$ ]]; then
-              NUM="${BASH_REMATCH[1]}"
-              BUILD_APK=true
-            else
-              echo "::error::tag 必须是纯数字（1、2、3 …）或 <数字>-apk（如 7-apk），当前为 $TAG"
+            if [[ ! "$TAG" =~ ^([0-9]+)$ ]]; then
+              echo "::error::tag 必须是纯数字（1、2、3 …），当前为 $TAG"
               exit 1
             fi
+            NUM="${BASH_REMATCH[1]}"
             if [ "$NUM" -lt 1 ]; then
               echo "::error::tag 版本号必须 >= 1"
               exit 1
@@ -52,22 +44,15 @@ jobs:
               echo "::error::缺少上一个版本 tag：$((NUM - 1))，请按顺序发版"
               exit 1
             fi
-            if [ "$BUILD_APK" = true ] && ! git rev-parse -q --verify "refs/tags/$NUM" >/dev/null; then
-              echo "::error::缺少对应的数字 tag：$NUM，请先发 $NUM 再发 $TAG"
-              exit 1
-            fi
           fi
-          echo "build_apk=$BUILD_APK" >> "$GITHUB_OUTPUT"
 
       - name: 配置 JDK 17
-        if: steps.meta.outputs.build_apk == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
       - name: 安装 SDK 组件
-        if: steps.meta.outputs.build_apk == 'true'
         run: |
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           SDKMANAGER=$(command -v sdkmanager || find "$SDK_ROOT/cmdline-tools" -name sdkmanager -type f | head -n1)
@@ -79,7 +64,6 @@ jobs:
           "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0"
 
       - name: 缓存 Gradle
-        if: steps.meta.outputs.build_apk == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -89,7 +73,6 @@ jobs:
           restore-keys: gradle-${{ runner.os }}-
 
       - name: 还原签名密钥
-        if: steps.meta.outputs.build_apk == 'true'
         env:
           KEYSTORE_FILE: ${{ runner.temp }}/c17-release.jks
         run: |
@@ -97,7 +80,6 @@ jobs:
           test -s "$KEYSTORE_FILE"
 
       - name: 构建 APK
-        if: steps.meta.outputs.build_apk == 'true'
         working-directory: code
         env:
           KEYSTORE_FILE: ${{ runner.temp }}/c17-release.jks
@@ -138,29 +120,10 @@ jobs:
 
       - name: 准备 APK
         id: apk
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "${{ steps.meta.outputs.build_apk }}" = "true" ]; then
-            APK="code/app/build/outputs/apk/release/app-release.apk"
-            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK"
-            cp "$APK" "ColorOS17PerfectIcon.apk"
-          else
-            echo "复用最近一次 Release 的 APK"
-            rm -f -- *.apk
-            if ! gh release download --pattern "*.apk" --dir .; then
-              echo "::error::最近一次 Release 没有可复用的 APK，请先发一个 <数字>-apk tag"
-              exit 1
-            fi
-            set -- *.apk
-            if [ "$1" != "ColorOS17PerfectIcon.apk" ]; then
-              echo "::warning::复用名为 $1 的 APK，重命名为 ColorOS17PerfectIcon.apk"
-              mv -- "$1" "ColorOS17PerfectIcon.apk"
-            fi
-            if [ "$#" -gt 1 ]; then
-              echo "::warning::最近一次 Release 有多个 APK，只使用 $1"
-            fi
-          fi
+          APK="code/app/build/outputs/apk/release/app-release.apk"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK"
+          cp "$APK" "ColorOS17PerfectIcon.apk"
           test -s "ColorOS17PerfectIcon.apk"
           echo "name=ColorOS17PerfectIcon.apk" >> "$GITHUB_OUTPUT"
 
@@ -208,8 +171,8 @@ jobs:
           TAG: ${{ github.ref_name }}
           REPO: ${{ github.repository }}
         run: |
-          # <数字>-apk tag 与对应数字 tag 同一版本，统一按数字取上一个版本
-          NUM="${TAG%-apk}"
+          # 纯数字 tag 即版本号，上一个版本直接减 1
+          NUM="$TAG"
           if [[ "$NUM" =~ ^[0-9]+$ ]] && [ "$NUM" -gt 1 ]; then
             PREV="$((NUM - 1))"
           else
