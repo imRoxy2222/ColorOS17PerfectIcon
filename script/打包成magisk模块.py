@@ -6,7 +6,7 @@ Linux / macOS / Windows 通用，自动识别当前系统（其实只需要 Pyth
 Magisk 模块 zip。
 
 用法：
-    python3 script/打包成magisk模块.py             # 输出 dist/<id>-<version>.zip
+    python3 script/打包成magisk模块.py             # 输出 dist/<id>-<commit数>.zip
     python3 script/打包成magisk模块.py -o out.zip  # 指定输出路径
     python3 script/打包成magisk模块.py -q          # 静默模式
 
@@ -221,7 +221,7 @@ def main() -> None:
             pass
 
     parser = argparse.ArgumentParser(description="打包 ColorOS 完美图标 Magisk 模块")
-    parser.add_argument("-o", "--output", help="输出 zip 路径（默认 dist/<id>-<version>.zip）")
+    parser.add_argument("-o", "--output", help="输出 zip 路径（默认 dist/<id>-<commit数>.zip）")
     parser.add_argument("-q", "--quiet", action="store_true", help="不打印文件清单")
     args = parser.parse_args()
 
@@ -229,7 +229,9 @@ def main() -> None:
         output = Path(args.output)
     else:
         props = parse_prop(ROOT / "module.prop")
-        name = f"{props.get('id', 'module')}-{props.get('version', 'unknown')}.zip"
+        commit_count = git_commit_count()
+        version = commit_count if commit_count is not None else props.get("version", "unknown")
+        name = f"{props.get('id', 'module')}-{version}.zip"
         output = ROOT / "dist" / name
 
     build(output, quiet=args.quiet)
