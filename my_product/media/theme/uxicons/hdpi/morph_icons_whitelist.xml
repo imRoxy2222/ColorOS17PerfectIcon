@@ -93,6 +93,7 @@
     <package_name>com.android.phone<morph>1</morph></package_name>
     <package_name>com.heytap.speechassist<morph>1</morph></package_name>
     <package_name>com.oplus.aimemory<morph>1</morph></package_name>
+    <package_name>com.oplus.aipaper<morph>1</morph><shortcut>1</shortcut></package_name>
     <package_name>com.oplus.ai.magicstudio<morph>1</morph></package_name>
     <package_name>com.android.email<morph>1</morph></package_name>
     <package_name>com.coloros.backuprestore<morph>1</morph></package_name>
