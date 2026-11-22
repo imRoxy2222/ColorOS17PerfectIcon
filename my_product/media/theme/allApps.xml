@@ -134,6 +134,7 @@
     <icon name="ic_launcher_todo.png" package="com.mediatek.todos"/>
     <icon name="ic_launcher_my_favorite.png" package="com.mediatek.myfavorite"/>
     <icon name="ic_launcher_mobile_portal.png" package="com.mediatek.mobileportal"/>
+    <icon name="com.merxury.blocker" package="com.merxury.blocker"/>
     <icon name="ic_launcher_dp_elong.png" package="com.dp.android.elong"/>
     <!-- -->
     <!-- 一淘火眼 -->
