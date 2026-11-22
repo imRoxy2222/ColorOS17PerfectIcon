@@ -1,0 +1,2 @@
+# <RRO 名> <目标包名>，RRO 名不含 .apk.bin 后缀；# 开头为注释
+IdlefishIconOverlay com.taobao.idlefish

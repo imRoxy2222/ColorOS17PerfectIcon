@@ -71,7 +71,8 @@ Overlay ... and target ... signed with different certificates, and the overlay l
 里**再叠一层 overlayfs**，把 RRO 注入进去：
 
 ```sh
-OV_ROOT=/data/adb/ColorOSPerfectIcon/overlay
+# upper / work 放在模块目录内，卸载模块时随之删除，不在系统分区留下文件
+OV_ROOT="$MODDIR/run/overlay"
 mkdir -p "$OV_ROOT/upper" "$OV_ROOT/work"
 cp -f "$MODDIR/overlay/IdlefishIconOverlay.apk.bin" "$OV_ROOT/upper/IdlefishIconOverlay.apk"
 chmod 644 "$OV_ROOT/upper/IdlefishIconOverlay.apk"
@@ -88,12 +89,24 @@ mount -t overlay overlay \
   否则 `system_server` 可能没有读取权限。
 - 完整实现见仓库根目录的 `post-fs-data.sh`。
 
+### 按需注入
+
+`post-fs-data` 阶段 `system_server` 还未启动，不能用 `pm` 判断应用是否安装。脚本改为：
+
+- 在 `overlay/targets.txt` 中集中登记映射，一行一个：`<RRO 名> <目标包名>`，`#` 开头为注释；
+- 注入前先查 `/data/system/packages.xml`，再按包名扫描 `/data/app/*/<包名>-*/base.apk` 以及
+  `/system`、`/system_ext`、`/product`、`/vendor`、`/odm`、`/my_*` 下的 `app` / `priv-app` 目录
+  （匹配 `<包名>`、`<包名>.apk`、`<包名>-*`）；
+- 目标未安装时跳过该 RRO，一个都没命中就不挂载 overlay；
+- 未在 `targets.txt` 登记的 RRO 保持旧行为，始终注入（向后兼容）。
+
 ### 仓库中的落地文件
 
 | 文件 | 作用 |
 | --- | --- |
 | `overlay/*.apk.bin` | 静态 RRO。打包脚本会排除 `.apk`，所以加 `.bin` 后缀随模块一起发布 |
-| `post-fs-data.sh` | 开机时遍历 `overlay/*.apk.bin`，用 overlayfs 把 APK 注入 `/product/overlay` |
+| `overlay/targets.txt` | RRO 与目标包名的映射。登记后才按需注入；未登记则始终注入 |
+| `post-fs-data.sh` | 开机时遍历 `overlay/*.apk.bin`，按 `targets.txt` 判断后注入 `/product/overlay` |
 
 当前已落地的 RRO：
 
@@ -144,8 +157,10 @@ com.taobao.idlefish
 3. 为每个资源名准备一张同名 PNG，放到 `res/drawable-xxhdpi/`；
 4. 用上面的命令构建、签名；
 5. 把 APK 放进 `overlay/` 并改名为 `*.apk.bin`，避免被打包脚本排除；
-6. `post-fs-data.sh` 会自动遍历 `overlay/*.apk.bin` 注入，无需再改脚本；
-7. 重启模块，用上面的命令验证。
+6. 在 `overlay/targets.txt` 追加一行 `<RRO 名> <包名>`（例如 `IdlefishIconOverlay com.taobao.idlefish`）；
+   目标未安装时脚本会自动跳过，未登记则始终注入；
+7. `post-fs-data.sh` 会自动遍历 `overlay/*.apk.bin` 注入，无需再改脚本；
+8. 重启模块，用上面的命令验证。
 
 注意事项：
 
