@@ -128,6 +128,8 @@ extract_icons() {
   _dst=$2
   _mode=${3:-full}
   _given=${4:-}
+  # 本次实际解压的应用数，供调用方判断是否需要补回 rec_night
+  _sync_extracted=0
 
   if [ ! -f "$_arc" ]; then
     _sync_msg "! 图标归档不存在：$_arc"
@@ -151,6 +153,7 @@ extract_icons() {
     fi
     _sync_msg "! 获取应用列表失败，回退为解压全部图标"
     $_uz -o -d "$_dst" "$_arc" >/dev/null 2>&1
+    _sync_extracted=1
     return 0
   fi
 
@@ -183,6 +186,7 @@ extract_icons() {
 
   # 一次 unzip 解出全部命中的目录，避免逐个应用起进程
   $_uz -o -d "$_dst" "$_arc" "$@" >/dev/null 2>&1
+  _sync_extracted=$_cnt
 
   _sync_msg "- 已为 $_cnt 个应用解压图标"
 }

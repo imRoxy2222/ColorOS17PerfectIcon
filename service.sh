@@ -19,7 +19,10 @@ while [ ! -s "$PKG_LIST" ] && [ "$_retry" -lt 3 ]; do
 done
 
 extract_icons "$MODDIR/icons.zip" "$SOURCE_ICONS" incremental "$PKG_LIST"
-fill_night_icons "$SOURCE_ICONS" "$NIGHT_FILL"
+# 只有本次为新安装应用解压了图标，才需要补回对应的 rec_night
+if [ "${_sync_extracted:-0}" -gt 0 ]; then
+  fill_night_icons "$SOURCE_ICONS" "$NIGHT_FILL"
+fi
 sync_icons "$SOURCE_ICONS" "/data/oplus/uxicons" incremental "$PKG_LIST"
 
 rm -f "$PKG_LIST"
