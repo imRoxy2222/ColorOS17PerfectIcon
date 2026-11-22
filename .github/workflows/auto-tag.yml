@@ -1,0 +1,92 @@
+name: Auto Tag
+
+on:
+  schedule:
+    # 每天 UTC 16:00 = 北京时间 00:00
+    - cron: "0 16 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 忽略 50 条提交门槛，立即打 tag（用于验证流程）
+        type: boolean
+        default: false
+
+permissions:
+  contents: write # 创建并推送 tag
+  actions: write # 派发 release.yml
+
+# 同一时间只允许一个实例，避免重复打 tag
+concurrency:
+  group: auto-tag
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    env:
+      MIN_COMMITS: "50"
+      FORCE: ${{ inputs.force }}
+    steps:
+      - name: 检出默认分支完整历史
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: 计算提交数并打 tag
+        id: calc
+        run: |
+          set -euo pipefail
+
+          # 只认纯数字 tag，忽略 2-apk / 3-apk 这类历史 tag
+          LAST=$(git tag -l | grep -E '^[0-9]+$' | sort -n | tail -n1 || true)
+          LAST=${LAST:-0}
+
+          if [ "$LAST" -gt 0 ]; then
+            RANGE="$LAST..HEAD"
+          else
+            RANGE="HEAD"
+          fi
+          COUNT=$(git rev-list --count "$RANGE")
+          NEXT=$((LAST + 1))
+
+          THRESHOLD=$MIN_COMMITS
+          if [ "${FORCE:-false}" = "true" ]; then
+            THRESHOLD=0
+          fi
+
+          echo "上个 tag: $LAST"
+          echo "距上个 tag 的提交数: $COUNT"
+          echo "门槛: $THRESHOLD，下一个 tag: $NEXT"
+
+          if [ "$COUNT" -lt "$THRESHOLD" ]; then
+            echo "should_tag=false" >> "$GITHUB_OUTPUT"
+            echo "未达到门槛，跳过打 tag"
+            exit 0
+          fi
+
+          # 兜底校验：N 必须已有 N-1（N=1 时免检）
+          if [ "$NEXT" -gt 1 ] && ! git rev-parse -q --verify "refs/tags/$((NEXT - 1))" >/dev/null; then
+            echo "::error::缺少上一个版本 tag $((NEXT - 1))，请先补齐"
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$NEXT" -m "Release $NEXT"
+          git push origin "refs/tags/$NEXT"
+
+          echo "should_tag=true" >> "$GITHUB_OUTPUT"
+          echo "tag=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "已创建并推送 tag $NEXT"
+
+      - name: 派发 Release 流水线
+        if: steps.calc.outputs.should_tag == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.calc.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # 在 tag ref 上派发，release.yml 内 github.ref_name 即为新 tag
+          gh workflow run release.yml --ref "$TAG"
