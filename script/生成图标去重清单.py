@@ -10,8 +10,8 @@
     dedupe.list              每行“相对路径 blob 文件名”
 
 安装时 customize.sh / service.sh 会按清单把 blob 复制回已安装应用的目录，
-因此素材目录里可以安全地省略这些重复文件。脚本可重复执行：已有清单会保留，
-只处理新出现的重复组。
+因此素材目录里可以安全地省略这些重复文件。脚本可重复执行：已有清单和 blob
+会保留，新出现的重复组（包括与已有 blob 内容相同的新文件）都会被收敛。
 """
 
 from __future__ import annotations
@@ -50,19 +50,27 @@ def main() -> None:
     entries = load_manifest()
     before = len(entries)
 
+    # 已有 blob 也要参与比对：新图标可能和之前收敛过的文件完全相同
+    blobs = {p.stem: p for p in BLOB_DIR.glob("*.png")} if BLOB_DIR.is_dir() else {}
+
     groups = defaultdict(list)
     for path in sorted(ICON_ROOT.rglob("*.png")):
         digest = hashlib.md5(path.read_bytes()).hexdigest()
         groups[digest].append(path)
 
-    dups = {digest: paths for digest, paths in groups.items() if len(paths) > 1}
+    # 两个以上文件相同，或单个文件与已有 blob 相同，都收敛
+    dups = {
+        digest: paths
+        for digest, paths in groups.items()
+        if len(paths) > 1 or digest in blobs
+    }
     removed = 0
     removed_bytes = 0
     blob_bytes = 0
 
     for digest, paths in sorted(dups.items()):
         blob = BLOB_DIR / ("%s.png" % digest)
-        new_blob = not blob.is_file()
+        new_blob = digest not in blobs
         if not args.dry_run:
             BLOB_DIR.mkdir(parents=True, exist_ok=True)
             if new_blob:
