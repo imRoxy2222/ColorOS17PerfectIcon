@@ -108,6 +108,31 @@ fill_dedupe_icons() {
   return 0
 }
 
+# 删除适配后，安装/开机会清掉 /data/oplus/uxicons 里遗留的旧目录。
+# 如果源目录里又出现了该目录（重新适配），则跳过，避免误删新图标。
+purge_removed_icons() {
+  _pr_src=$1
+  _pr_list=$2
+  _pr_dst=$3
+
+  [ -f "$_pr_list" ] || return 0
+
+  _pr_n=0
+  while IFS= read -r _pr_rel; do
+    [ -n "$_pr_rel" ] || continue
+    case "$_pr_rel" in
+      '#'*) continue ;;
+      *..*|/*) continue ;;
+    esac
+    [ -e "$_pr_src/$_pr_rel" ] && continue
+    [ -e "$_pr_dst/$_pr_rel" ] || continue
+    rm -rf "$_pr_dst/$_pr_rel" && _pr_n=$((_pr_n + 1))
+  done < "$_pr_list"
+
+  [ "$_pr_n" -gt 0 ] && _sync_msg "- 已清理遗留图标 $_pr_n 个"
+  return 0
+}
+
 # 找到可用的 unzip（安装阶段在安装器 PATH 里，开机阶段回退到 KernelSU 自带 busybox）
 _sync_unzip() {
   if command -v unzip >/dev/null 2>&1; then

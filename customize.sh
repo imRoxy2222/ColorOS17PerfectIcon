@@ -13,6 +13,7 @@ SOURCE_ICONS="$MODPATH/my_product/media/theme/uxicons/hdpi"
 NIGHT_FILL="$MODPATH/my_product/media/theme/uxicons/night_fill.list"
 DEDUPE_LIST="$MODPATH/dedupe.list"
 DEDUPE_BLOBS="$MODPATH/dedupe_blobs"
+REMOVED_LIST="$MODPATH/removed.list"
 TARGET_ICONS="/data/oplus/uxicons"
 
 # 包列表只取一次，解压和同步都复用，避免反复调用 pm
@@ -37,6 +38,7 @@ fi
 if [ -d "$SOURCE_ICONS" ]; then
   ui_print "- 正在同步图标到 $TARGET_ICONS"
   sync_icons "$SOURCE_ICONS" "$TARGET_ICONS" full "$PKG_LIST"
+  purge_removed_icons "$SOURCE_ICONS" "$REMOVED_LIST" "$TARGET_ICONS"
 else
   ui_print "! 未找到图标文件夹，跳过图标同步"
 fi

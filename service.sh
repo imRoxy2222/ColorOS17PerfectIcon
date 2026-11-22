@@ -7,6 +7,7 @@ SOURCE_ICONS="$MODDIR/my_product/media/theme/uxicons/hdpi"
 NIGHT_FILL="$MODDIR/my_product/media/theme/uxicons/night_fill.list"
 DEDUPE_LIST="$MODDIR/dedupe.list"
 DEDUPE_BLOBS="$MODDIR/dedupe_blobs"
+REMOVED_LIST="$MODDIR/removed.list"
 
 . "$MODDIR/icon_sync.sh"
 
@@ -28,5 +29,6 @@ if [ "${_sync_extracted:-0}" -gt 0 ]; then
   fill_night_icons "$SOURCE_ICONS" "$NIGHT_FILL"
 fi
 sync_icons "$SOURCE_ICONS" "/data/oplus/uxicons" incremental "$PKG_LIST"
+purge_removed_icons "$SOURCE_ICONS" "$REMOVED_LIST" "/data/oplus/uxicons"
 
 rm -f "$PKG_LIST"
