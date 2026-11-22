@@ -8,7 +8,7 @@ mount --bind "$MODDIR/my_product/media/theme/" /my_product/media/theme/
 # 之后往里写文件不会被它看到，所以只能再叠一层 overlayfs 把 APK 注入进去。
 # system_server 扫描 overlay 目录发生在 post-fs-data 之后，因此这里挂载是有效的。
 OV_BIN="$MODDIR/overlay/IdlefishIconOverlay.apk.bin"
-OV_ROOT=/data/adb/ColorOSPerfectIcon/overlay
+OV_ROOT="$MODDIR/run/overlay"
 if [ -f "$OV_BIN" ] && [ -d /product/overlay ]; then
   rm -rf "$OV_ROOT"
   mkdir -p "$OV_ROOT/upper" "$OV_ROOT/work"
