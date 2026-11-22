@@ -92,8 +92,14 @@ mount -t overlay overlay \
 
 | 文件 | 作用 |
 | --- | --- |
-| `overlay/IdlefishIconOverlay.apk.bin` | 静态 RRO。打包脚本会排除 `.apk`，所以加 `.bin` 后缀随模块一起发布 |
-| `post-fs-data.sh` | 开机时用 overlayfs 把上面的 APK 注入 `/product/overlay` |
+| `overlay/*.apk.bin` | 静态 RRO。打包脚本会排除 `.apk`，所以加 `.bin` 后缀随模块一起发布 |
+| `post-fs-data.sh` | 开机时遍历 `overlay/*.apk.bin`，用 overlayfs 把 APK 注入 `/product/overlay` |
+
+当前已落地的 RRO：
+
+| 文件 | 目标应用 | 覆盖的资源 |
+| --- | --- | --- |
+| `IdlefishIconOverlay.apk.bin` | 闲鱼 `com.taobao.idlefish` | 22 个 alias 图标 + 默认图标 |
 
 ### 构建与验证
 
@@ -138,7 +144,7 @@ com.taobao.idlefish
 3. 为每个资源名准备一张同名 PNG，放到 `res/drawable-xxhdpi/`；
 4. 用上面的命令构建、签名；
 5. 把 APK 放进 `overlay/` 并改名为 `*.apk.bin`，避免被打包脚本排除；
-6. 在 `post-fs-data.sh` 中把新 APK 复制到 `$OV_ROOT/upper/`（当前脚本只处理闲鱼一个文件，可改成遍历 `overlay/*.apk.bin`）；
+6. `post-fs-data.sh` 会自动遍历 `overlay/*.apk.bin` 注入，无需再改脚本；
 7. 重启模块，用上面的命令验证。
 
 注意事项：
