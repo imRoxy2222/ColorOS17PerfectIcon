@@ -809,7 +809,6 @@
     <icon name="com.huanchengfly.tieba.post" package="com.huanchengfly.tieba.post"/>
     <icon name="com.midea.ai.appliances" package="com.midea.ai.appliances"/>
     <icon name="com.pikcloud.pikpak" package="com.pikcloud.pikpak"/>
-    <icon name="com.xayah.databackup.foss和com.xayah.databackup.premium" package="com.xayah.databackup.foss和com.xayah.databackup.premium"/>
     <icon name="com.yandex.browser" package="com.yandex.browser"/>
     <icon name="com.yingyonghui.market" package="com.yingyonghui.market"/>
     <icon name="com.zhihu.hydrogen.x" package="com.zhihu.hydrogen.x"/>
@@ -1011,6 +1010,7 @@
     <icon name="com.whatnot_mobile" package="com.whatnot_mobile"/>
     <icon name="com.wstxda.viper4android" package="com.wstxda.viper4android"/>
     <icon name="com.wyl.exam" package="com.wyl.exam"/>
+    <icon name="com.xayah.databackup.foss" package="com.xayah.databackup.foss"/>
     <icon name="com.xayah.databackup.premium" package="com.xayah.databackup.premium"/>
     <icon name="com.xingin.messagepro" package="com.xingin.messagepro"/>
     <icon name="com.xjcheng.musictageditor" package="com.xjcheng.musictageditor"/>

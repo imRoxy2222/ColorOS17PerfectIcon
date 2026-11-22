@@ -2471,7 +2471,6 @@
     <item package="com.github.clash.for.android.stable"/>
     <item package="com.huanchengfly.tieba.post"/>
     <item package="com.pikcloud.pikpak"/>
-    <item package="com.xayah.databackup.foss和com.xayah.databackup.premium"/>
     <item package="com.yandex.browser"/>
     <item package="com.yingyonghui.market"/>
     <item package="com.zhihu.hydrogen.x"/>
@@ -2657,6 +2656,7 @@
     <item package="com.whatnot_mobile"/>
     <item package="com.wstxda.viper4android"/>
     <item package="com.wyl.exam"/>
+    <item package="com.xayah.databackup.foss"/>
     <item package="com.xayah.databackup.premium"/>
     <item package="com.xingin.messagepro"/>
     <item package="com.xjcheng.musictageditor"/>
