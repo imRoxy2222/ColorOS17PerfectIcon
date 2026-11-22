@@ -4,6 +4,7 @@
 
 MODDIR=${0%/*}
 SOURCE_ICONS="$MODDIR/my_product/media/theme/uxicons/hdpi"
+NIGHT_FILL="$MODDIR/my_product/media/theme/uxicons/night_fill.list"
 
 . "$MODDIR/icon_sync.sh"
 
@@ -18,6 +19,7 @@ while [ ! -s "$PKG_LIST" ] && [ "$_retry" -lt 3 ]; do
 done
 
 extract_icons "$MODDIR/icons.zip" "$SOURCE_ICONS" incremental "$PKG_LIST"
+fill_night_icons "$SOURCE_ICONS" "$NIGHT_FILL"
 sync_icons "$SOURCE_ICONS" "/data/oplus/uxicons" incremental "$PKG_LIST"
 
 rm -f "$PKG_LIST"

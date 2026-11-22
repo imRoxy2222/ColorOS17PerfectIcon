@@ -24,6 +24,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 THEME = ROOT / "my_product" / "media" / "theme"
 HDPI = THEME / "uxicons" / "hdpi"
+NIGHT_FILL = THEME / "uxicons" / "night_fill.list"
 ALL_APPS = THEME / "allApps.xml"
 DRAWABLE = THEME / "drawableMapping.xml"
 MORPH = HDPI / "morph_icons_whitelist.xml"
@@ -53,6 +54,14 @@ def load_packages(path, tag):
         if value:
             packages.add(value.strip())
     return packages
+
+
+def load_night_fill(path):
+    """读取瘦身清单：这些 rec_night 会在安装时由 recfg 复制生成。"""
+    try:
+        return {line.strip() for line in path.read_text().splitlines() if line.strip()}
+    except OSError:
+        return set()
 
 
 def load_whitelist(path):
@@ -143,6 +152,7 @@ def main():
     all_apps = load_packages(ALL_APPS, "icon")
     drawable = load_packages(DRAWABLE, "item")
     whitelist = load_whitelist(MORPH)
+    night_fill = load_night_fill(NIGHT_FILL)
 
     directories = sorted(
         (p for p in HDPI.iterdir() if p.is_dir() and not is_ignored(p.name)),
@@ -171,7 +181,14 @@ def main():
             errors[name] = problems
 
         if args.assets:
-            missing_icons = [f for f in REQUIRED_ICONS if not (path / f).is_file()]
+            missing_icons = []
+            for f in REQUIRED_ICONS:
+                if (path / f).is_file():
+                    continue
+                # 与 recfg 逐字节相同的 rec_night 已从素材中省略，安装时会自动补回
+                if f == "rec_night.png" and "%s/%s" % (name, f) in night_fill:
+                    continue
+                missing_icons.append(f)
             if missing_icons:
                 errors.setdefault(name, []).append(
                     "缺少 1×1 素材：" + "、".join(missing_icons)

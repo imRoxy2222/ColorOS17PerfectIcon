@@ -10,6 +10,7 @@ unzip -o "$ZIPFILE" -x 'META-INF/*' -d $MODPATH >&2
 
 ICON_ARCHIVE="$MODPATH/icons.zip"
 SOURCE_ICONS="$MODPATH/my_product/media/theme/uxicons/hdpi"
+NIGHT_FILL="$MODPATH/my_product/media/theme/uxicons/night_fill.list"
 TARGET_ICONS="/data/oplus/uxicons"
 
 # 包列表只取一次，解压和同步都复用，避免反复调用 pm
@@ -23,6 +24,10 @@ if [ -f "$ICON_ARCHIVE" ]; then
   extract_icons "$ICON_ARCHIVE" "$SOURCE_ICONS" full "$PKG_LIST"
 else
   ui_print "! 压缩包内未找到图标归档，跳过图标解压"
+fi
+
+if [ -d "$SOURCE_ICONS" ]; then
+  fill_night_icons "$SOURCE_ICONS" "$NIGHT_FILL"
 fi
 
 if [ -d "$SOURCE_ICONS" ]; then

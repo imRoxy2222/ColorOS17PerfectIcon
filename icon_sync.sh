@@ -43,6 +43,41 @@ _sync_set_perm() {
   return 0
 }
 
+# 仓库为瘦身省略了与 recfg 完全相同的 rec_night，这里按清单复制还原，
+# 保证桌面在 /my_product/media/theme 与 /data/oplus/uxicons 中看到的仍是完整三件套。
+fill_night_icons() {
+  _fn_src=$1
+  _fn_list=$2
+
+  if [ ! -f "$_fn_list" ]; then
+    _sync_msg "! 缺少暗色前景清单：$_fn_list"
+    return 0
+  fi
+
+  _fn_n=0
+  while IFS= read -r _fn_rel; do
+    [ -n "$_fn_rel" ] || continue
+    _fn_dst="$_fn_src/$_fn_rel"
+    [ -f "$_fn_dst" ] && continue
+
+    _fn_dir=${_fn_dst%/*}
+    _fn_base=${_fn_dst##*/}
+    case $_fn_base in
+      rec_night.png)     _fn_fg="$_fn_dir/recfg.png" ;;
+      rec_night_1x2.png) _fn_fg="$_fn_dir/recfg_1x2.png" ;;
+      rec_night_2x1.png) _fn_fg="$_fn_dir/recfg_2x1.png" ;;
+      rec_night_2x2.png) _fn_fg="$_fn_dir/recfg_2x2.png" ;;
+      *) continue ;;
+    esac
+
+    [ -f "$_fn_fg" ] || continue
+    cp -f "$_fn_fg" "$_fn_dst" 2>/dev/null && _fn_n=$((_fn_n + 1))
+  done < "$_fn_list"
+
+  [ "$_fn_n" -gt 0 ] && _sync_msg "- 已补回暗色前景 $_fn_n 个"
+  return 0
+}
+
 # 找到可用的 unzip（安装阶段在安装器 PATH 里，开机阶段回退到 KernelSU 自带 busybox）
 _sync_unzip() {
   if command -v unzip >/dev/null 2>&1; then
