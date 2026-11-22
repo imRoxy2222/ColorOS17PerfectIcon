@@ -2261,6 +2261,7 @@
     <icon name="com.lenovo.club.app" package="com.lenovo.club.app"/>
     <icon name="com.lenovo.leos.cloud.sync" package="com.lenovo.leos.cloud.sync"/>
     <icon name="com.lenovoimage.LenovoPrint" package="com.lenovoimage.LenovoPrint"/>
+    <icon name="com.legado.app.release" package="com.legado.app.release"/>
     <icon name="com.lerdong.dm78" package="com.lerdong.dm78"/>
     <icon name="com.lerist.fakelocation.common.xposed" package="com.lerist.fakelocation.common.xposed"/>
     <icon name="com.lerist.xposed.apptranslator" package="com.lerist.xposed.apptranslator"/>

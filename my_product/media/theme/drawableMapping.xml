@@ -1100,6 +1100,7 @@
     <item package="com.lenovoimage.LenovoPrint"/>
     <item package="com.lerdong.dm78"/>
     <item package="com.lerist.fakelocation"/>
+    <item package="com.legado.app.release"/>
     <item package="com.lerist.fakelocation.common.xposed"/>
     <item package="com.lerist.xposed.apptranslator"/>
     <item package="com.letv.android.client"/>
