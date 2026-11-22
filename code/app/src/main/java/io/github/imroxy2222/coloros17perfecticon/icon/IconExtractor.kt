@@ -15,9 +15,10 @@ import kotlin.math.max
 /**
  * 通过 PackageManager 读取桌面可见应用的图标。
  *
- * 不需要 root / Xposed：
+ * 读取模块覆盖不需要 root / Xposed：
  * - 桌面入口用 ACTION_MAIN + CATEGORY_LAUNCHER 查询；
- * - 是否“已适配”以用户导入的模块图标包 zip 中是否包含该包名为准，见 [ModuleIconZip]。
+ * - 模块覆盖以用户导入的图标包 zip 中是否包含该包名为准，见 [ModuleIconZip]；
+ * - 官方适配由 [OfficialIconSource] 读取应用内置的包名清单，不需要 root。
  */
 class IconExtractor(context: Context) {
 
@@ -51,7 +52,11 @@ class IconExtractor(context: Context) {
         return map.values.sortedBy { it.label.lowercase() }
     }
 
-    fun detect(app: LauncherApp, adaptedPackages: Set<String>): AppItem {
+    fun detect(
+        app: LauncherApp,
+        adaptedPackages: Set<String>,
+        officialPackages: Set<String>,
+    ): AppItem {
         val icon = loadIcon(app.pkg, app.iconRes, night = false)
         val adaptiveIcon = icon as? AdaptiveIconDrawable
         return AppItem(
@@ -59,10 +64,12 @@ class IconExtractor(context: Context) {
             label = app.label,
             iconRes = app.iconRes,
             // 图标包里也可能用「包名 + Activity」命名目录，命中前缀也算覆盖
-            state = if (adaptedPackages.any { it == app.pkg || it.startsWith(app.pkg + ".") }) {
-                AdaptState.MODULE
-            } else {
-                AdaptState.NONE
+            state = when {
+                adaptedPackages.any { it == app.pkg || it.startsWith(app.pkg + ".") } ->
+                    AdaptState.MODULE
+
+                app.pkg in officialPackages -> AdaptState.OFFICIAL
+                else -> AdaptState.NONE
             },
             adaptive = adaptiveIcon != null,
             monochrome = adaptiveIcon?.let { hasMonochrome(it) } ?: false,

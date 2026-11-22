@@ -98,6 +98,7 @@ import io.github.imroxy2222.coloros17perfecticon.icon.AppItem
 import io.github.imroxy2222.coloros17perfecticon.icon.IconExtractor
 import io.github.imroxy2222.coloros17perfecticon.icon.ModuleIconStore
 import io.github.imroxy2222.coloros17perfecticon.icon.ModuleIconZip
+import io.github.imroxy2222.coloros17perfecticon.icon.OfficialIconSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -169,6 +170,7 @@ fun AppScreen() {
     val extractor = remember { IconExtractor(context) }
     val exporter = remember { Exporter(context, extractor) }
     val moduleStore = remember { ModuleIconStore(context) }
+    val officialSource = remember { OfficialIconSource(context) }
     val savedModule = remember { moduleStore.load() }
 
     var drawerOpen by remember { mutableStateOf(false) }
@@ -188,7 +190,7 @@ fun AppScreen() {
         snapshot.filter { item ->
             val tabMatched = when (tab) {
                 1 -> item.state == AdaptState.NONE
-                2 -> item.state == AdaptState.MODULE
+                2 -> item.state != AdaptState.NONE
                 else -> true
             }
             tabMatched && (query.isBlank() ||
@@ -221,11 +223,14 @@ fun AppScreen() {
                     .getOrDefault(emptyList())
             }
             state.total = apps.size
+            val official = withContext(Dispatchers.IO) {
+                runCatching { officialSource.loadPackages() }.getOrDefault(emptySet())
+            }
 
             withContext(Dispatchers.IO) {
                 for ((index, app) in apps.withIndex()) {
                     if (!isActive) break
-                    val item = runCatching { extractor.detect(app, adapted) }.getOrNull()
+                    val item = runCatching { extractor.detect(app, adapted, official) }.getOrNull()
                     withContext(Dispatchers.Main) {
                         if (item != null) state.apps.add(item)
                         state.scanned = index + 1
@@ -359,13 +364,17 @@ fun AppScreen() {
         }
     }
 
-    val moduleCount = snapshot.count { it.state == AdaptState.MODULE }
+    val adaptedCount = snapshot.count { it.state != AdaptState.NONE }
+    val officialCount = snapshot.count { it.state == AdaptState.OFFICIAL }
     val summaryTitle = if (state.scanning) {
         "正在扫描 ${state.scanned} / ${state.total}"
     } else {
         "共 ${snapshot.size} 个应用"
     }
-    val summaryDetail = "未适配 ${snapshot.size - moduleCount}\n已适配 $moduleCount"
+    val summaryDetail = buildString {
+        append("未适配 ${snapshot.size - adaptedCount}\n已适配 $adaptedCount")
+        if (officialCount > 0) append("（官适配 $officialCount）")
+    }
     val selectedCount = state.selected.count { it.value }
     val exportCount = if (selectedCount > 0) selectedCount else filtered.size
     val pageLayer = rememberGraphicsLayer()
@@ -484,7 +493,7 @@ fun AppScreen() {
                         state.modulePkgs.isEmpty() -> {
                             EmptyState(
                                 state.scanError
-                                    ?: "先导入模块 zip，再按包内是否包含该应用判定已适配",
+                                    ?: "先导入模块 zip；模块内已包含的记为已适配，系统官方已适配的记为官适配",
                                 action = "导入模块 zip",
                                 onAction = { pickModuleZip() },
                             )
@@ -677,7 +686,7 @@ private fun OptionsDrawer(state: UiState, onImport: () -> Unit, onClear: () -> U
         BasicComponent(
             title = "导入模块 zip",
             summary = state.moduleName?.let { "$it · ${state.modulePkgs.size} 个应用" }
-                ?: "未导入，导入后按包内是否包含该应用判定已适配",
+                ?: "未导入，导入后按包内是否包含该应用判定已适配（官方适配单独标记）",
             onClick = onImport,
             insideMargin = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
         )
@@ -710,7 +719,7 @@ private fun OptionsDrawer(state: UiState, onImport: () -> Unit, onClear: () -> U
             checked = state.optIncludeAdapted,
             onCheckedChange = { state.optIncludeAdapted = it },
             title = "导出已适配应用",
-            summary = "默认跳过模块 zip 里已包含的应用",
+            summary = "默认跳过模块已有及官方已适配的应用",
             insideMargin = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
         )
         SuperSwitch(
@@ -884,6 +893,20 @@ private fun StatusTag(state: AdaptState) {
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 color = MiuixTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+
+        AdaptState.OFFICIAL -> Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color(0xFFFFC107))
+                .padding(horizontal = 7.dp, vertical = 2.dp),
+        ) {
+            Text(
+                "官适配",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF3A2C00),
             )
         }
 
