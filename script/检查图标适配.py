@@ -25,6 +25,8 @@ ROOT = Path(__file__).resolve().parent.parent
 THEME = ROOT / "my_product" / "media" / "theme"
 HDPI = THEME / "uxicons" / "hdpi"
 NIGHT_FILL = THEME / "uxicons" / "night_fill.list"
+DEDUPE_LIST = ROOT / "dedupe.list"
+DEDUPE_BLOBS = ROOT / "dedupe_blobs"
 ALL_APPS = THEME / "allApps.xml"
 DRAWABLE = THEME / "drawableMapping.xml"
 MORPH = HDPI / "morph_icons_whitelist.xml"
@@ -62,6 +64,20 @@ def load_night_fill(path):
         return {line.strip() for line in path.read_text().splitlines() if line.strip()}
     except OSError:
         return set()
+
+
+def load_dedupe(list_path, blob_dir):
+    """读取共享图标清单，返回运行时会被补回、且 blob 存在的相对路径。"""
+    paths = set()
+    try:
+        lines = list_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return paths
+    for line in lines:
+        parts = line.split()
+        if len(parts) == 2 and (blob_dir / parts[1]).is_file():
+            paths.add(parts[0])
+    return paths
 
 
 def load_whitelist(path):
@@ -153,6 +169,7 @@ def main():
     drawable = load_packages(DRAWABLE, "item")
     whitelist = load_whitelist(MORPH)
     night_fill = load_night_fill(NIGHT_FILL)
+    dedupe = load_dedupe(DEDUPE_LIST, DEDUPE_BLOBS)
 
     directories = sorted(
         (p for p in HDPI.iterdir() if p.is_dir() and not is_ignored(p.name)),
@@ -185,8 +202,10 @@ def main():
             for f in REQUIRED_ICONS:
                 if (path / f).is_file():
                     continue
-                # 与 recfg 逐字节相同的 rec_night 已从素材中省略，安装时会自动补回
+                # 与 recfg 逐字节相同的 rec_night、以及共享图标，都会在安装时自动补回
                 if f == "rec_night.png" and "%s/%s" % (name, f) in night_fill:
+                    continue
+                if "%s/%s" % (name, f) in dedupe:
                     continue
                 missing_icons.append(f)
             if missing_icons:
@@ -214,8 +233,8 @@ def main():
                 print("  - %s" % problem)
 
     print()
-    print("配置文件：allApps.xml %d 条，drawableMapping.xml %d 条，morph 白名单 %d 条"
-          % (len(all_apps), len(drawable), len(whitelist)))
+    print("配置文件：allApps.xml %d 条，drawableMapping.xml %d 条，morph 白名单 %d 条，共享图标 %d 条"
+          % (len(all_apps), len(drawable), len(whitelist), len(dedupe)))
     print("检查目录：%d 个" % len(directories))
     print("结果：错误 %d 个，警告 %d 个" % (len(errors), len(warnings)))
     if warnings and not args.verbose and not args.strict:

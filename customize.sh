@@ -11,6 +11,8 @@ unzip -o "$ZIPFILE" -x 'META-INF/*' -d $MODPATH >&2
 ICON_ARCHIVE="$MODPATH/icons.zip"
 SOURCE_ICONS="$MODPATH/my_product/media/theme/uxicons/hdpi"
 NIGHT_FILL="$MODPATH/my_product/media/theme/uxicons/night_fill.list"
+DEDUPE_LIST="$MODPATH/dedupe.list"
+DEDUPE_BLOBS="$MODPATH/dedupe_blobs"
 TARGET_ICONS="/data/oplus/uxicons"
 
 # 包列表只取一次，解压和同步都复用，避免反复调用 pm
@@ -27,6 +29,8 @@ else
 fi
 
 if [ -d "$SOURCE_ICONS" ]; then
+  # 先还原共享图标，fill_night_icons 才能拿到可能被去重的 recfg
+  fill_dedupe_icons "$SOURCE_ICONS" "$DEDUPE_LIST" "$DEDUPE_BLOBS"
   fill_night_icons "$SOURCE_ICONS" "$NIGHT_FILL"
 fi
 

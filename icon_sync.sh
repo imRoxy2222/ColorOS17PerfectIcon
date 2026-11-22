@@ -78,6 +78,36 @@ fill_night_icons() {
   return 0
 }
 
+# 仓库把逐字节相同的图标收敛到了 dedupe_blobs/，这里按清单复制回各应用目录。
+# 只处理目标目录已存在的应用（解压阶段已按已安装应用过滤）。
+fill_dedupe_icons() {
+  _fd_src=$1
+  _fd_list=$2
+  _fd_blobs=$3
+
+  if [ ! -f "$_fd_list" ]; then
+    _sync_msg "! 缺少去重清单：$_fd_list"
+    return 0
+  fi
+  if [ ! -d "$_fd_blobs" ]; then
+    _sync_msg "! 缺少去重 blob 目录：$_fd_blobs"
+    return 0
+  fi
+
+  _fd_n=0
+  while read -r _fd_rel _fd_blob; do
+    [ -n "$_fd_rel" ] || continue
+    _fd_dst="$_fd_src/$_fd_rel"
+    [ -f "$_fd_dst" ] && continue
+    [ -d "${_fd_dst%/*}" ] || continue
+    [ -f "$_fd_blobs/$_fd_blob" ] || continue
+    cp -f "$_fd_blobs/$_fd_blob" "$_fd_dst" 2>/dev/null && _fd_n=$((_fd_n + 1))
+  done < "$_fd_list"
+
+  [ "$_fd_n" -gt 0 ] && _sync_msg "- 已补回共享图标 $_fd_n 个"
+  return 0
+}
+
 # 找到可用的 unzip（安装阶段在安装器 PATH 里，开机阶段回退到 KernelSU 自带 busybox）
 _sync_unzip() {
   if command -v unzip >/dev/null 2>&1; then

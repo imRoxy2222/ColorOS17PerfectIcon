@@ -5,6 +5,8 @@
 MODDIR=${0%/*}
 SOURCE_ICONS="$MODDIR/my_product/media/theme/uxicons/hdpi"
 NIGHT_FILL="$MODDIR/my_product/media/theme/uxicons/night_fill.list"
+DEDUPE_LIST="$MODDIR/dedupe.list"
+DEDUPE_BLOBS="$MODDIR/dedupe_blobs"
 
 . "$MODDIR/icon_sync.sh"
 
@@ -19,8 +21,10 @@ while [ ! -s "$PKG_LIST" ] && [ "$_retry" -lt 3 ]; do
 done
 
 extract_icons "$MODDIR/icons.zip" "$SOURCE_ICONS" incremental "$PKG_LIST"
-# 只有本次为新安装应用解压了图标，才需要补回对应的 rec_night
+# 只有本次为新安装应用解压了图标，才需要补回共享图标和对应的 rec_night。
+# 必须先还原共享图标，fill_night_icons 才能拿到可能被去重的 recfg。
 if [ "${_sync_extracted:-0}" -gt 0 ]; then
+  fill_dedupe_icons "$SOURCE_ICONS" "$DEDUPE_LIST" "$DEDUPE_BLOBS"
   fill_night_icons "$SOURCE_ICONS" "$NIGHT_FILL"
 fi
 sync_icons "$SOURCE_ICONS" "/data/oplus/uxicons" incremental "$PKG_LIST"
